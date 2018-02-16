@@ -153,12 +153,12 @@ def callPeaks(scoreListF, scoreListR, seed):
             pass
         # Smooth over the data multiple times
         smoothedScoresF = savitzky_golay(scoreListF, 51, 2, deriv = 0, \
-                                                     rate = 1, returnScoreList = True)
+                                         rate = 1, returnScoreList = True)
         for iteration in range(3):
             smoothedScoresF = savitzky_golay(smoothedScoresF, 71, 2, deriv = 0, \
-                                                         rate = 1, returnScoreList = True)
+                                             rate = 1, returnScoreList = True)
         peaksF = savitzky_golay(smoothedScoresF, 51, 1, deriv = 0, \
-                                           rate = 1, returnScoreList = False)
+                                rate = 1, returnScoreList = False)
         # Add all of the smoothed peaks to list of all peaks
         peaksFAdj = list(seed + np.array(peaksF))
         allPeaks += peaksFAdj
@@ -178,88 +178,86 @@ def callPeaks(scoreListF, scoreListR, seed):
                     scoreListR[j] = 1
         except IndexError:
             pass
-        smoothedScoresR = savitzky_golay(scoreListR, 51, 2, deriv=0, \
-                                                     rate=1, returnScoreList=True)
+        smoothedScoresR = savitzky_golay(scoreListR, 51, 2, deriv = 0, \
+                                         rate = 1, returnScoreList = True)
         for iteration in range(3):
-            smoothedScoresR = savitzky_golay(smoothedScoresR, 71, 2, deriv=0, \
-                                                         rate=1, returnScoreList=True)
-        peaksR = savitzky_golay(smoothedScoresR, 51, 1, deriv=0, \
-                                            rate=1, returnScoreList=False)
+            smoothedScoresR = savitzky_golay(smoothedScoresR, 71, 2, deriv = 0, \
+                                             rate = 1, returnScoreList = True)
+        peaksR = savitzky_golay(smoothedScoresR, 51, 1, deriv = 0, \
+                                rate = 1, returnScoreList = False)
         peaksRAdj = list(seed - np.array(peaksR))
         allPeaks += peaksRAdj
 
     # calculates the median distance between detected peaks
     forMedian = []
     for i in range(len(allPeaks) - 1):
-        forMedian.append(allPeaks[i+1] - allPeaks[i])
+        forMedian.append(allPeaks[i + 1] - allPeaks[i])
     forMedian = [rounding(x, 50) for x in forMedian]
     medianDistance = np.median(forMedian)
     return sorted(list(set(allPeaks))), medianDistance
 
 def split_SW(name, seq1, seq2, rc):
     '''This probably parses the SW_PARSE file'''
-    diag_dict={}
-    diag_list=set()
-    score_lists=[]
-    for step in range(0,len(seq1),1000):
-        seq3=seq1[step:min(len(seq1),step+1000)]
-        seq4=seq2[:1000]
+    diag_dict = {}
+    diag_list = set()
+    score_lists = []
+    for step in range(0, len(seq1), 1000):
+        seq3 = seq1[step:min(len(seq1), step + 1000)]
+        seq4 = seq2[:1000]
 
-        align_file1=open('seq3.fasta','w')
-        align_file1.write('>'+name+'\n'+seq3+'\n')
+        align_file1 = open('seq3.fasta', 'w')
+        align_file1.write('>' + name + '\n' + seq3 + '\n')
         align_file1.close()
-        align_file2=open('seq4.fasta','w')
-        align_file2.write('>'+name+'\n'+seq4+'\n')
+        align_file2 = open('seq4.fasta', 'w')
+        align_file2.write('>' + name + '\n' + seq4 + '\n')
         align_file2.close()
 
-        diagonal='no'
-        if step==0 and rc==False:
-            diagonal='yes'
+        diagonal = 'no'
+        if step == 0 and not rc:
+            diagonal = 'yes'
 
-        x_limit1=len(seq3)
-        y_limit1=len(seq4)
+        x_limit1 = len(seq3)
+        y_limit1 = len(seq4)
 
-        os.system('%s -asequence seq3.fasta -bsequence seq4.fasta -datafile EDNAFULL -gapopen 25 -outfile align.whatever -gapextend 1  %s %s %s >./sw.txt 2>&1' %(water,diagonal,x_limit1,y_limit1))
-        matrix_file='SW_PARSE.txt'
-        diag_list,diag_dict=parse_file(matrix_file,rc,len(seq1),step,diag_dict,diag_list)
+        os.system('%s -asequence seq3.fasta -bsequence seq4.fasta -datafile EDNAFULL -gapopen 25 -outfile align.whatever -gapextend 1  %s %s %s >./sw.txt 2>&1' %(water, diagonal, x_limit1, y_limit1))
+        matrix_file = 'SW_PARSE.txt'
+        diag_list,diag_dict = parse_file(matrix_file, rc, len(seq1), step, diag_dict, diag_list)
         os.system('rm SW_PARSE.txt')
 
-    diag_list=sorted(list(diag_list))
-    plot_list=[]
+    diag_list = sorted(list(diag_list))
+    plot_list = []
     for diag in diag_list:
         plot_list.append(diag_dict[diag])
-    score_lists=plot_list
+    score_lists = plot_list
     return score_lists
 
 def parse_file(matrix_file, rc, seq_length, step, diag_dict, diag_list):
-
     for line in open(matrix_file):
-        a=line.strip().split(':')
-        position=int(a[0])+step
-        if rc==False:
-            position=np.abs(position)
-        value=int(a[1])
+        line = line.strip().split(':')
+        position = int(line[0]) + step
+        if not rc:
+            position = np.abs(position)
+        value = int(line[1])
         diag_list.add(position)
         try:
-            diag_dict[position]+=value
+            diag_dict[position] += value
         except:
-            diag_dict[position]=value
+            diag_dict[position] = value
+    return diag_list, diag_dict
 
-    return diag_list,diag_dict
-
-def determine_consensus(name,seq,peaks,qual,median_distance):
+def determine_consensus(name, seq, peaks, qual, median_distance):
     '''Aligns and returns the consensus'''
-    repeats=''
-    corrected_consensus=''
-    if median_distance>500 and len(peaks)>1:
-        out_F=temp_folder+'/'+name+'_F.fasta'
-        out_Fq=temp_folder+'/'+name+'_F.fastq'
-        poa_cons=temp_folder+'/'+name+'_consensus.fasta'
-        final=temp_folder+'/'+name+'_corrected_consensus.fasta'
-        overlap=temp_folder+'/'+name+'_overlaps.sam'
-        pairwise=temp_folder+'/'+name+'_prelim_consensus.fasta'
+    repeats = ''
+    corrected_consensus = ''
+    if median_distance > 500 and len(peaks) > 1:
+        out_F = temp_folder + '/' + name + '_F.fasta'
+        out_Fq = temp_folder + '/' + name + '_F.fastq'
+        poa_cons = temp_folder + '/' + name + '_consensus.fasta'
+        final = temp_folder + '/' + name + '_corrected_consensus.fasta'
+        overlap = temp_folder +'/' + name + '_overlaps.sam'
+        pairwise = temp_folder + '/' + name + '_prelim_consensus.fasta'
 
-        repeats=split_read(peaks, seq, out_F, qual, out_Fq, name)
+        repeats = split_read(peaks, seq, out_F, qual, out_Fq, name)
 
         PIR = temp_folder + '/' + name + 'alignment.fasta'
         os.system('%s -read_fasta %s -hb -pir %s -do_progressive %s >./poa_messages.txt 2>&1' %(poa, out_F, PIR, score_matrix))
@@ -295,13 +293,11 @@ def read_fastq_file(seq_file):
     length = 0
     for line in open(seq_file):
         length += 1
-    x = 0
+    lineNum = 0
     seq_file_open = open(seq_file, 'r')
-    while x < length:
+    while lineNum < length:
         name_root = seq_file_open.readline().strip()[1:].split('_')
-        name = name_root[0]
-
-        seed = int(name_root[1])
+        name, seed = name_root[0], int(name_root[1])
         seq = seq_file_open.readline().strip()
         plus = seq_file_open.readline().strip()
         qual = seq_file_open.readline().strip()
@@ -311,10 +307,8 @@ def read_fastq_file(seq_file):
             quals.append(number)
         average_quals = np.average(quals)
         seq_length = len(seq)
-
         read_list.append((name, seed, seq, qual, average_quals, seq_length))
-
-        x += 4
+        lineNum += 4
     return read_list
 
 def analyze_reads(read_list):
@@ -322,10 +316,10 @@ def analyze_reads(read_list):
     for name, seed, seq, qual, average_quals, seq_length in read_list:
         if 1000 < seq_length:
             final_consensus = ''
-            score_lists_f = split_SW(name,seq[seed:],seq[seed:],False)
+            score_lists_f = split_SW(name, seq[seed:], seq[seed:], False)
             score_lists_r = split_SW(name, reverse_complement(seq[:seed]), reverse_complement(seq[:seed]), False)
             peaks,median_distance = callPeaks(score_lists_f, score_lists_r, seed)
-            print(name, seq_length,peaks)
+            print(name, seq_length, peaks)
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, qual, median_distance)
             if final_consensus != '':
                 final_out = open(out_file, 'a')
