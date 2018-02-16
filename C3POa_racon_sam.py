@@ -329,10 +329,12 @@ def analyze_reads(read_list):
             # score lists are made for sequence before and after the seed
             score_lists_f = split_SW(name, seq[seed:], seq[seed:], False)
             score_lists_r = split_SW(name, revComp(seq[:seed]), revComp(seq[:seed]), False)
+            # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(score_lists_f, score_lists_r, seed)
             print(name, seq_length, peaks)
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, qual, median_distance)
-            if final_consensus != '':
+            # output the consensus sequence
+            if final_consensus:
                 final_out = open(out_file, 'a')
                 final_out.write('>' + name + '_' + str(round(average_quals, 2)) + '_' + str(seq_length) + '_' + str(repeats1) + '_' + str(len(final_consensus)))
                 final_out.write('\n' + final_consensus + '\n')
