@@ -2,12 +2,17 @@
 # Roger Volden and Chris Vollmers
 # 16 Feb 2018
 
-import numpy as np
+'''
+Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
+
+Analyses reads by reading them in, doing self-self alignments, calling
+peaks in alignment scores, splitting reads, aligning those to each other,
+and giving back a consensus sequence.
+'''
+
 import os
 import sys
-from scipy.signal import find_peaks_cwt
-from scipy.signal import argrelmin
-from scipy.signal import argrelmax
+import numpy as np
 
 def reverse_complement(sequence):
     '''Returns the reverse complement of a sequence'''
