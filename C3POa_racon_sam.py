@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# 16 Feb 2018
+# Last updated: 16 Feb 2018
 
 '''
 Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
