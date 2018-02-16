@@ -27,23 +27,6 @@ import os
 import sys
 import numpy as np
 
-poa = 'poa'
-score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
-water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
-consensus = 'python3 /home/vollmers/scripts/consensus.py'
-minimap2 = 'minimap2'
-racon = '/home/vollmers/scripts/racon/bin/racon'
-
-temp_folder = 'tmp1'
-path = sys.argv[1]
-input_file = sys.argv[2]
-os.chdir(path)
-out_file = 'R2C2_Consensus.fasta'
-subread_file = 'subreads.fastq'
-sub = open(path + '/' + subread_file, 'w')
-os.system('rm -r ' + temp_folder)
-os.system('mkdir ' + temp_folder)
-
 def revComp(sequence):
     '''Returns the reverse complement of a sequence'''
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
@@ -396,7 +379,24 @@ def analyze_reads(read_list):
 
 def main():
     '''Controls the flow of the program'''
-    final_out = open(out_file, 'w')
+    global poa = 'poa'
+    global score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
+    global water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
+    global consensus = 'python3 /home/vollmers/scripts/consensus.py'
+    global minimap2 = 'minimap2'
+    global racon = '/home/vollmers/scripts/racon/bin/racon'
+
+    global temp_folder = 'tmp1'
+    path = sys.argv[1]
+    input_file = sys.argv[2]
+    os.chdir(path)
+    out_file = 'R2C2_Consensus.fasta'
+    subread_file = 'subreads.fastq'
+    global sub = open(path + '/' + subread_file, 'w')
+    os.system('rm -r ' + temp_folder)
+    os.system('mkdir ' + temp_folder)
+
+    global final_out = open(out_file, 'w')
     final_out.close()
     print(input_file)
     read_list = read_fastq_file(input_file)
