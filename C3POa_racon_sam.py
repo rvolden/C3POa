@@ -5,31 +5,14 @@ from scipy.signal import find_peaks_cwt
 from scipy.signal import argrelmin
 from scipy.signal import argrelmax
 
-poa = 'poa'
-score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
-water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
-consensus = 'python3 /home/vollmers/scripts/consensus.py'
-minimap2 = 'minimap2'
-racon = '/home/vollmers/scripts/racon/bin/racon'
-
-temp_folder = 'tmp1'
-input_file = sys.argv[2]
-path = sys.argv[1]
-os.chdir(path)
-out_file = 'R2C2_Consensus.fasta'
-subread_file = 'subreads.fastq'
-sub = open(path + '/' + subread_file, 'w')
-os.system('rm -r ' + temp_folder)
-os.system('mkdir ' + temp_folder)
-
 def reverse_complement(sequence):
-    '''Returns the reverse complement of a sequence.'''
+    '''Returns the reverse complement of a sequence'''
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
     return ''.join([bases[x] for x in list(sequence)])[::-1]
 
 def split_read(reduced_split_set, sequence, out_file1, qual, out_file1q, name):
     '''
-
+    Fill this out later
     '''
     out_F = open(out_file1, 'w')
     out_Fq = open(out_file1q, 'w')
@@ -53,7 +36,7 @@ def split_read(reduced_split_set, sequence, out_file1, qual, out_file1q, name):
     return repeats
 
 def read_fasta(inFile):
-    '''Reads in FASTA files, returns a dict of header:sequence.'''
+    '''Reads in FASTA files, returns a dict of header:sequence'''
     readDict = {}
     tempSeqs, headers, sequences = [], [], []
     for line in inFile:
@@ -74,16 +57,18 @@ def read_fasta(inFile):
     return readDict
 
 def rounding(x, base):
+    '''Rounds to the nearest base, we use 50'''
     return int(base * round(float(x)/base))
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False):
     '''
-    Smooths over data using a Ssavitzky Golay filter.
-    This can either return a list of scores, or a list of peaks.
+    Smooths over data using a Ssavitzky Golay filter
+    This can either return a list of scores, or a list of peaks
 
-    y : array-like, data list.
-    window_size : int, how big of a window to smooth.
+    y : array-like, score list
+    window_size : int, how big of a window to smooth
     order : what order polynomial
+    returnScoreList : bool
     '''
     from math import factorial
     y = np.array(y)
@@ -194,7 +179,6 @@ def callPeaks(scoreListF, scoreListR, seed):
         peaksRAdj = list(seed - np.array(peaksR))
         allPeaks += peaksRAdj
 
-
     forMedian = []
     for i in range(len(allPeaks) - 1):
         forMedian.append(allPeaks[i+1] - allPeaks[i])
@@ -203,7 +187,8 @@ def callPeaks(scoreListF, scoreListR, seed):
 
     return sorted(list(set(allPeaks))), medianDistance
 
-def split_SW(name,seq1,seq2,rc):
+def split_SW(name, seq1, seq2, rc):
+    '''This probably parses the SW_PARSE file'''
     diag_dict={}
     diag_list=set()
     score_lists=[]
@@ -230,8 +215,6 @@ def split_SW(name,seq1,seq2,rc):
         diag_list,diag_dict=parse_file(matrix_file,rc,len(seq1),step,diag_dict,diag_list)
         os.system('rm SW_PARSE.txt')
 
-
-
     diag_list=sorted(list(diag_list))
     plot_list=[]
     for diag in diag_list:
@@ -239,9 +222,7 @@ def split_SW(name,seq1,seq2,rc):
     score_lists=plot_list
     return score_lists
 
-
-
-def parse_file(matrix_file,rc,seq_length,step,diag_dict,diag_list):
+def parse_file(matrix_file, rc, seq_length, step, diag_dict, diag_list):
 
     for line in open(matrix_file):
         a=line.strip().split(':')
@@ -258,7 +239,7 @@ def parse_file(matrix_file,rc,seq_length,step,diag_dict,diag_list):
     return diag_list,diag_dict
 
 def determine_consensus(name,seq,peaks,qual,median_distance):
-
+    '''Aligns and returns the consensus'''
     repeats=''
     corrected_consensus=''
     if median_distance>500 and len(peaks)>1:
@@ -300,6 +281,7 @@ def determine_consensus(name,seq,peaks,qual,median_distance):
     return corrected_consensus,repeats
 
 def read_fastq_file(seq_file):
+    '''Reads fastq files, I should use my own for this instead'''
     read_list = []
     length = 0
     for line in open(seq_file):
@@ -327,8 +309,9 @@ def read_fastq_file(seq_file):
     return read_list
 
 def analyze_reads(read_list):
+    '''No idea what this is doing yet'''
     for name, seed, seq, qual, average_quals, seq_length in read_list:
-        if 1000<seq_length:
+        if 1000 < seq_length:
             final_consensus = ''
             score_lists_f = split_SW(name,seq[seed:],seq[seed:],False)
             score_lists_r = split_SW(name, reverse_complement(seq[:seed]), reverse_complement(seq[:seed]), False)
@@ -343,6 +326,24 @@ def analyze_reads(read_list):
                 os.system('rm -r ' + temp_folder + '/*')
 
 def main():
+    '''Controls the flow of the program'''
+    poa = 'poa'
+    score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
+    water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
+    consensus = 'python3 /home/vollmers/scripts/consensus.py'
+    minimap2 = 'minimap2'
+    racon = '/home/vollmers/scripts/racon/bin/racon'
+
+    temp_folder = 'tmp1'
+    input_file = sys.argv[2]
+    path = sys.argv[1]
+    os.chdir(path)
+    out_file = 'R2C2_Consensus.fasta'
+    subread_file = 'subreads.fastq'
+    sub = open(path + '/' + subread_file, 'w')
+    os.system('rm -r ' + temp_folder)
+    os.system('mkdir ' + temp_folder)
+
     final_out = open(out_file, 'w')
     final_out.close()
     print(input_file)
