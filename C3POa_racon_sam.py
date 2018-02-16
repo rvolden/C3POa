@@ -32,27 +32,40 @@ def revComp(sequence):
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
     return ''.join([bases[x] for x in list(sequence)])[::-1]
 
-def split_read(reduced_split_set, sequence, out_file1, qual, out_file1q, name):
+def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
     '''
     Fill this out later
     '''
     out_F = open(out_file1, 'w')
     out_Fq = open(out_file1q, 'w')
     distance = []
-    for index in range(len(reduced_split_set) - 1):
-        split1 = reduced_split_set[index]
-        split2 = reduced_split_set[index + 1]
+    for index in range(len(split_list) - 1):
+        split1 = split_list[index]
+        split2 = split_list[index + 1]
         if len(sequence[split1:split2]) > 30:
-            out_F.write('>' + str(index + 1) + '\n' + sequence[split1:split2] + '\n')
-            out_Fq.write('@' + str(index + 1) + '\n' + sequence[split1:split2] + '\n + \n' + qual[split1:split2] + '\n')
-            sub.write('@' + name + '_' + str(index + 1) +' \n' + sequence[split1:split2] + '\n + \n' + qual[split1:split2] + '\n')
+            out_F.write('>' + str(index + 1) + '\n' + \
+                        sequence[split1:split2] + '\n')
+            out_Fq.write('@' + str(index + 1) + '\n' + \
+                         sequence[split1:split2] + '\n + \n' + \
+                         qual[split1:split2] + '\n')
+            sub.write('@' + name + '_' + str(index + 1) +' \n' + \
+                      sequence[split1:split2] + '\n + \n' + \
+                      qual[split1:split2] + '\n')
 
-    '''make a condition so we only return sequences that are >50 bases long'''
-    out_Fq.write('@' + str(0) + '\n' + sequence[0:reduced_split_set[0]] + '\n + \n' + qual[0:reduced_split_set[0]] + '\n')
-    sub.write('@' + name + '_' + str(0) + '\n' + sequence[0:reduced_split_set[0]] + '\n + \n' + qual[0:reduced_split_set[0]] + '\n')
-    out_Fq.write('@' +str(index + 2) + '\n' + sequence[split2:] + '\n + \n' + qual[split2:] + '\n')
-    sub.write('@' + name + '_' + str(index + 2) + '\n' + sequence[split2:] + '\n + \n' + qual[split2:] + '\n')
-    repeats = str(int(index+1))
+    if len(sequence[:split_list[0]]) > 50 and len(sequence[split2:]) > 50:
+        out_Fq.write('@' + str(0) + '\n' + \
+                     sequence[0:split_list[0]] + '\n + \n' + \
+                     qual[0:split_list[0]] + '\n')
+        sub.write('@' + name + '_' + str(0) + '\n' + \
+                  sequence[0:split_list[0]] + '\n + \n' + \
+                  qual[0:split_list[0]] + '\n')
+        out_Fq.write('@' +str(index + 2) + '\n' + \
+                     sequence[split2:] + '\n + \n' + \
+                     qual[split2:] + '\n')
+        sub.write('@' + name + '_' + str(index + 2) + '\n' + \
+                  sequence[split2:] + '\n + \n' + \
+                  qual[split2:] + '\n')
+    repeats = str(int(index + 1))
     out_F.close()
     out_Fq.close()
     return repeats
