@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# Roger Volden and Chris Vollmers
+# 16 Feb 2018
+
 import numpy as np
 import os
 import sys
