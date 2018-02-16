@@ -27,6 +27,23 @@ import os
 import sys
 import numpy as np
 
+poa = 'poa'
+score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
+water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
+consensus = 'python3 /home/vollmers/scripts/consensus.py'
+minimap2 = 'minimap2'
+racon = '/home/vollmers/scripts/racon/bin/racon'
+
+temp_folder = 'tmp1'
+path = sys.argv[1]
+input_file = sys.argv[2]
+os.chdir(path)
+out_file = 'R2C2_Consensus.fasta'
+subread_file = 'subreads.fastq'
+sub = open(path + '/' + subread_file, 'w')
+os.system('rm -r ' + temp_folder)
+os.system('mkdir ' + temp_folder)
+
 def revComp(sequence):
     '''Returns the reverse complement of a sequence'''
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
@@ -322,7 +339,16 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
     return corrected_consensus, repeats
 
 def read_fastq_file(seq_file):
-    '''Reads fastq files, I should use my own for this instead'''
+    '''
+    Takes a FASTQ file and returns a list of tuples
+    In each tuple:
+        name : str, read ID
+        seed : int, first occurrence of the splint
+        seq : str, sequence
+        qual : str, quality line
+        average_quals : float, average quality of that line
+        seq_length : int, length of the sequence
+    '''
     read_list = []
     length = 0
     for line in open(seq_file):
@@ -370,23 +396,6 @@ def analyze_reads(read_list):
 
 def main():
     '''Controls the flow of the program'''
-    poa = 'poa'
-    score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
-    water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
-    consensus = 'python3 /home/vollmers/scripts/consensus.py'
-    minimap2 = 'minimap2'
-    racon = '/home/vollmers/scripts/racon/bin/racon'
-
-    temp_folder = 'tmp1'
-    path = sys.argv[1]
-    input_file = sys.argv[2]
-    os.chdir(path)
-    out_file = 'R2C2_Consensus.fasta'
-    subread_file = 'subreads.fastq'
-    sub = open(path + '/' + subread_file, 'w')
-    os.system('rm -r ' + temp_folder)
-    os.system('mkdir ' + temp_folder)
-
     final_out = open(out_file, 'w')
     final_out.close()
     print(input_file)
