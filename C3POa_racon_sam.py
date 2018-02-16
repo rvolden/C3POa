@@ -16,11 +16,13 @@ Dependencies:
     Python 3.6
     NumPy 1.13.3
     poa v1.0.0 Revision: 1.2.2.9
-    EMBOSS water: Theron v8
+    EMBOSS water: watHerON v8
     minimap2 2.7-r654
 
 To do:
     Add argument parser for more robust use.
+
+this is a test
 '''
 
 import os
@@ -34,21 +36,29 @@ def revComp(sequence):
 
 def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
     '''
-    Fill this out later
+    split_list : list, peak positions
+    sequence : str
+    out_file1 : output FASTA file
+    qual : str, quality line from FASTQ
+    out_file1q : output FASTQ file
+    name : str, read ID
+
+    Writes sequences to FASTA and FASTQ files.
+    Returns number of repeats in the sequence.
     '''
     out_F = open(out_file1, 'w')
     out_Fq = open(out_file1q, 'w')
     distance = []
-    for index in range(len(split_list) - 1):
-        split1 = split_list[index]
-        split2 = split_list[index + 1]
+    for i in range(len(split_list) - 1):
+        split1 = split_list[i]
+        split2 = split_list[i + 1]
         if len(sequence[split1:split2]) > 30:
-            out_F.write('>' + str(index + 1) + '\n' + \
+            out_F.write('>' + str(i + 1) + '\n' + \
                         sequence[split1:split2] + '\n')
-            out_Fq.write('@' + str(index + 1) + '\n' + \
+            out_Fq.write('@' + str(i + 1) + '\n' + \
                          sequence[split1:split2] + '\n + \n' + \
                          qual[split1:split2] + '\n')
-            sub.write('@' + name + '_' + str(index + 1) +' \n' + \
+            sub.write('@' + name + '_' + str(i + 1) +' \n' + \
                       sequence[split1:split2] + '\n + \n' + \
                       qual[split1:split2] + '\n')
 
@@ -59,13 +69,13 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
         sub.write('@' + name + '_' + str(0) + '\n' + \
                   sequence[0:split_list[0]] + '\n + \n' + \
                   qual[0:split_list[0]] + '\n')
-        out_Fq.write('@' +str(index + 2) + '\n' + \
+        out_Fq.write('@' +str(i + 2) + '\n' + \
                      sequence[split2:] + '\n + \n' + \
                      qual[split2:] + '\n')
-        sub.write('@' + name + '_' + str(index + 2) + '\n' + \
+        sub.write('@' + name + '_' + str(i + 2) + '\n' + \
                   sequence[split2:] + '\n + \n' + \
                   qual[split2:] + '\n')
-    repeats = str(int(index + 1))
+    repeats = str(int(i + 1))
     out_F.close()
     out_Fq.close()
     return repeats
