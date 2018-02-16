@@ -9,12 +9,18 @@ Analyses reads by reading them in, doing self-self alignments, calling
 peaks in alignment scores, splitting reads, aligning those to each other,
 and giving back a consensus sequence.
 
+Usage:
+    python3 C3POa_racon_sam.py /current/directory/ reads.fastq
+
 Dependencies:
     Python 3.6
     NumPy 1.13.3
     poa v1.0.0 Revision: 1.2.2.9
     EMBOSS water: Theron v8
     minimap2 2.7-r654
+
+To do:
+    Add argument parser for more robust use.
 '''
 
 import os
