@@ -21,7 +21,7 @@ import os
 import sys
 import numpy as np
 
-def reverse_complement(sequence):
+def revComp(sequence):
     '''Returns the reverse complement of a sequence'''
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
     return ''.join([bases[x] for x in list(sequence)])[::-1]
@@ -292,7 +292,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
         for read in reads:
             corrected_consensus = reads[read]
 
-    return corrected_consensus,repeats
+    return corrected_consensus, repeats
 
 def read_fastq_file(seq_file):
     '''Reads fastq files, I should use my own for this instead'''
@@ -319,13 +319,17 @@ def read_fastq_file(seq_file):
     return read_list
 
 def analyze_reads(read_list):
-    '''No idea what this is doing yet'''
+    '''
+    Takes reads that are longer than 1000 bases and gives the consensus.
+    Writes to R2C2_Consensus.fasta
+    '''
     for name, seed, seq, qual, average_quals, seq_length in read_list:
         if 1000 < seq_length:
             final_consensus = ''
+            # score lists are made for sequence before and after the seed
             score_lists_f = split_SW(name, seq[seed:], seq[seed:], False)
-            score_lists_r = split_SW(name, reverse_complement(seq[:seed]), reverse_complement(seq[:seed]), False)
-            peaks,median_distance = callPeaks(score_lists_f, score_lists_r, seed)
+            score_lists_r = split_SW(name, revComp(seq[:seed]), revComp(seq[:seed]), False)
+            peaks, median_distance = callPeaks(score_lists_f, score_lists_r, seed)
             print(name, seq_length, peaks)
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, qual, median_distance)
             if final_consensus != '':
@@ -333,7 +337,7 @@ def analyze_reads(read_list):
                 final_out.write('>' + name + '_' + str(round(average_quals, 2)) + '_' + str(seq_length) + '_' + str(repeats1) + '_' + str(len(final_consensus)))
                 final_out.write('\n' + final_consensus + '\n')
                 final_out.close()
-                os.system('rm -r ' + temp_folder + '/*')
+                os.system('rm -rf ' + temp_folder)
 
 def main():
     '''Controls the flow of the program'''
@@ -345,8 +349,8 @@ def main():
     racon = '/home/vollmers/scripts/racon/bin/racon'
 
     temp_folder = 'tmp1'
-    input_file = sys.argv[2]
     path = sys.argv[1]
+    input_file = sys.argv[2]
     os.chdir(path)
     out_file = 'R2C2_Consensus.fasta'
     subread_file = 'subreads.fastq'
