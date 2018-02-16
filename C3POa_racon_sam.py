@@ -117,7 +117,7 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False
     slopes = np.diff(posFiltered)
     la = 45 # how far in sequence to look ahead
     for i in range(len(slopes)-50):
-        if i > len(slopes)-la:
+        if i > len(slopes)-la: # probably irrelevant now
             dec = all(slopes[i+x]<0 for x in range(1, 50))
             if slopes[i] > 0 and dec:
                 if i not in peaks:
@@ -166,7 +166,7 @@ def callPeaks(scoreListF, scoreListR, seed):
     # Covers the case where the seed is 0
     if not scoreListR:
         smoothedScoresR = []
-    # Filter base noise for reverse scores
+    # Do the same-ish thing for the reverse peaks
     else:
         noise = 0
         try:
@@ -188,12 +188,12 @@ def callPeaks(scoreListF, scoreListR, seed):
         peaksRAdj = list(seed - np.array(peaksR))
         allPeaks += peaksRAdj
 
+    # calculates the median distance between detected peaks
     forMedian = []
     for i in range(len(allPeaks) - 1):
         forMedian.append(allPeaks[i+1] - allPeaks[i])
     forMedian = [rounding(x, 50) for x in forMedian]
     medianDistance = np.median(forMedian)
-
     return sorted(list(set(allPeaks))), medianDistance
 
 def split_SW(name, seq1, seq2, rc):
