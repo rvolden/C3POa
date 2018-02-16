@@ -21,8 +21,6 @@ Dependencies:
 
 To do:
     Add argument parser for more robust use.
-
-this is a test
 '''
 
 import os
