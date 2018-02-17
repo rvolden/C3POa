@@ -270,7 +270,10 @@ def split_SW(name, seq1, seq2, rc):
         x_limit1 = len(seq3)
         y_limit1 = len(seq4)
 
-        os.system('%s -asequence seq3.fasta -bsequence seq4.fasta -datafile EDNAFULL -gapopen 25 -outfile align.whatever -gapextend 1  %s %s %s >./sw.txt 2>&1' %(water, diagonal, x_limit1, y_limit1))
+        os.system('%s -asequence seq3.fasta -bsequence seq4.fasta\
+                  -datafile EDNAFULL -gapopen 25 -outfile align.whatever \
+                  -gapextend 1  %s %s %s >./sw.txt 2>&1' \
+                  %(water, diagonal, x_limit1, y_limit1))
         matrix_file = 'SW_PARSE.txt'
         diag_set, diag_dict = parse_file(matrix_file, rc, len(seq1), step)
         os.system('rm SW_PARSE.txt')
@@ -284,7 +287,7 @@ def split_SW(name, seq1, seq2, rc):
 def parse_file(matrix_file, rc, seq_length, step):
     '''
     matrix_file : watHerON output file
-    rc : bool, not sure what it is
+    rc : bool, not sure what it is <- I don't think this is even doing anything
     seq_length : int, length of the sequence
     step : int, some position
     Returns:
@@ -295,9 +298,9 @@ def parse_file(matrix_file, rc, seq_length, step):
     for line in open(matrix_file):
         line = line.strip().split(':')
         position = int(line[0]) + step
-        if not rc:
+        if not rc: # this will always happen
             position = np.abs(position)
-        value = int(line[1])
+        value = int(line[1]) # actual score
         diag_set.add(position)
         try:
             diag_dict[position] += value
