@@ -249,10 +249,9 @@ def callPeaks(scoreListF, scoreListR, seed):
     return sorted(list(set(allPeaks))), medianDistance
 
 def split_SW(name, seq1, seq2, rc):
-    '''This probably parses the SW_PARSE file'''
-    diag_dict = {}
-    diag_list = set()
-    score_lists = []
+    '''
+    I think there's some redundancy here that I can change or make more efficient
+    '''
     for step in range(0, len(seq1), 1000):
         seq3 = seq1[step:min(len(seq1), step + 1000)]
         seq4 = seq2[:1000]
@@ -273,29 +272,38 @@ def split_SW(name, seq1, seq2, rc):
 
         os.system('%s -asequence seq3.fasta -bsequence seq4.fasta -datafile EDNAFULL -gapopen 25 -outfile align.whatever -gapextend 1  %s %s %s >./sw.txt 2>&1' %(water, diagonal, x_limit1, y_limit1))
         matrix_file = 'SW_PARSE.txt'
-        diag_list,diag_dict = parse_file(matrix_file, rc, len(seq1), step, diag_dict, diag_list)
+        diag_set, diag_dict = parse_file(matrix_file, rc, len(seq1), step)
         os.system('rm SW_PARSE.txt')
 
-    diag_list = sorted(list(diag_list))
+    diag_set = sorted(list(diag_set))
     plot_list = []
-    for diag in diag_list:
+    for diag in diag_set:
         plot_list.append(diag_dict[diag])
-    score_lists = plot_list
-    return score_lists
+    return plot_list
 
-def parse_file(matrix_file, rc, seq_length, step, diag_dict, diag_list):
+def parse_file(matrix_file, rc, seq_length, step):
+    '''
+    matrix_file : watHerON output file
+    rc : bool, not sure what it is
+    seq_length : int, length of the sequence
+    step : int, some position
+    Returns:
+        diag_set : set, positions
+        diag_dict : dict, position : diagonal alignment scores
+    '''
+    diag_dict, diag_set = {}, set()
     for line in open(matrix_file):
         line = line.strip().split(':')
         position = int(line[0]) + step
         if not rc:
             position = np.abs(position)
         value = int(line[1])
-        diag_list.add(position)
+        diag_set.add(position)
         try:
             diag_dict[position] += value
         except:
             diag_dict[position] = value
-    return diag_list, diag_dict
+    return diag_set, diag_dict
 
 def determine_consensus(name, seq, peaks, qual, median_distance):
     '''Aligns and returns the consensus'''
