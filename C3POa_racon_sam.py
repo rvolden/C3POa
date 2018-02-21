@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 16 Feb 2018
+# Last updated: 21 Feb 2018
 
 '''
 Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
@@ -10,7 +10,7 @@ peaks in alignment scores, splitting reads, aligning those to each other,
 and giving back a consensus sequence.
 
 Usage:
-    python3 C3POa_racon_sam.py /current/directory/ reads.fastq
+    python3 C3POa_racon_sam.py --reads reads.fastq [--path /current/directory]
 
 Dependencies:
     Python 3.6
