@@ -18,16 +18,24 @@ Dependencies:
     poa v1.0.0 Revision: 1.2.2.9
     EMBOSS water: watHerON v8
     minimap2 2.7-r654
-
-To do:
-    Add argument parser for more robust use.
 '''
 
 import os
 import sys
 import numpy as np
+import argparse
 
-'''Putting these globals here until I decide to make a class'''
+parser = argparse.ArgumentParser(description = 'Makes consensus sequences \
+                                                from R2C2 reads.',
+                                 add_help = True,
+                                 prefix_chars = '-')
+required = parser.add_argument_group('Required arguments')
+required.add_argument('--reads', '-r', type=str, action='store', required=True, \
+                      help='FASTQ file that contains the long R2C2 reads.')
+parser.add_argument('--path', '-p', type=str, action='store', default=os.getcwd(), \
+                    help='Directory where all the files are/where they will end up.')
+arguments = vars(parser.parse_args())
+
 poa = 'poa'
 score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
 water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
@@ -36,8 +44,8 @@ minimap2 = 'minimap2'
 racon = '/home/vollmers/scripts/racon/bin/racon'
 
 temp_folder = 'tmp1'
-path = sys.argv[1]
-input_file = sys.argv[2]
+path = arguments['path']
+input_file = arguments['reads']
 os.chdir(path)
 out_file = 'R2C2_Consensus.fasta'
 subread_file = 'subreads.fastq'
@@ -67,30 +75,30 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
     distance = []
     for i in range(len(split_list) - 1):
         split1 = split_list[i]
-        split2 = split_list[i + 1]
+        split2 = split_list[i+1]
         if len(sequence[split1:split2]) > 30:
-            out_F.write('>' + str(i + 1) + '\n' + \
-                        sequence[split1:split2] + '\n')
-            out_Fq.write('@' + str(i + 1) + '\n' + \
-                         sequence[split1:split2] + '\n + \n' + \
-                         qual[split1:split2] + '\n')
-            sub.write('@' + name + '_' + str(i + 1) +' \n' + \
-                      sequence[split1:split2] + '\n + \n' + \
-                      qual[split1:split2] + '\n')
+            out_F.write('>' + str(i + 1) + '\n' \
+                        + sequence[split1:split2] + '\n')
+            out_Fq.write('@' + str(i + 1) + '\n' \
+                         + sequence[split1:split2] + '\n + \n' \
+                         + qual[split1:split2] + '\n')
+            sub.write('@' + name + '_' + str(i + 1) +' \n' \
+                      + sequence[split1:split2] + '\n + \n' \
+                      + qual[split1:split2] + '\n')
 
     if len(sequence[:split_list[0]]) > 50 and len(sequence[split2:]) > 50:
-        out_Fq.write('@' + str(0) + '\n' + \
-                     sequence[0:split_list[0]] + '\n + \n' + \
-                     qual[0:split_list[0]] + '\n')
-        sub.write('@' + name + '_' + str(0) + '\n' + \
-                  sequence[0:split_list[0]] + '\n + \n' + \
-                  qual[0:split_list[0]] + '\n')
-        out_Fq.write('@' +str(i + 2) + '\n' + \
-                     sequence[split2:] + '\n + \n' + \
-                     qual[split2:] + '\n')
-        sub.write('@' + name + '_' + str(i + 2) + '\n' + \
-                  sequence[split2:] + '\n + \n' + \
-                  qual[split2:] + '\n')
+        out_Fq.write('@' + str(0) + '\n' \
+                     + sequence[0:split_list[0]] + '\n + \n' \
+                     + qual[0:split_list[0]] + '\n')
+        sub.write('@' + name + '_' + str(0) + '\n' \
+                  + sequence[0:split_list[0]] + '\n + \n' \
+                  + qual[0:split_list[0]] + '\n')
+        out_Fq.write('@' + str(i + 2) + '\n' \
+                     + sequence[split2:] + '\n + \n' \
+                     + qual[split2:] + '\n')
+        sub.write('@' + name + '_' + str(i + 2) + '\n' \
+                  + sequence[split2:] + '\n + \n' \
+                  + qual[split2:] + '\n')
     repeats = str(int(i + 1))
     out_F.close()
     out_Fq.close()
@@ -143,13 +151,13 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False
     if window_size < order + 2:
         raise TypeError("window_size is too small for the polynomials order")
     order_range = range(order + 1)
-    half_window = (window_size -1) // 2
+    half = (window_size -1) // 2
     # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window + 1)])
+    b = np.mat([[k**i for i in order_range] for k in range(-half, half + 1)])
     m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
     # pad the signal at the extremes with values taken from the signal itself
-    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
-    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+    firstvals = y[0] - np.abs( y[1:half+1][::-1] - y[0] )
+    lastvals = y[-1] + np.abs(y[-half-1:-1][::-1] - y[-1])
     y = np.concatenate((firstvals, y, lastvals))
     filtered = np.convolve( m[::-1], y, mode='valid')
 
@@ -168,14 +176,14 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False
     peaks = []
     slopes = np.diff(posFiltered)
     la = 45 # how far in sequence to look ahead
-    for i in range(len(slopes)-50):
-        if i > len(slopes)-la: # probably irrelevant now
-            dec = all(slopes[i+x]<0 for x in range(1, 50))
+    for i in range(len(slopes) - 50):
+        if i > len(slopes) - la: # probably irrelevant now
+            dec = all(slopes[i+x] < 0 for x in range(1, 50))
             if slopes[i] > 0 and dec:
                 if i not in peaks:
                     peaks.append(i)
         else:
-            dec = all(slopes[i+x]<0 for x in range(1, la))
+            dec = all(slopes[i+x] < 0 for x in range(1, la))
             if slopes[i] > 0 and dec:
                 peaks.append(i)
     return peaks
@@ -243,12 +251,12 @@ def callPeaks(scoreListF, scoreListR, seed):
     # calculates the median distance between detected peaks
     forMedian = []
     for i in range(len(allPeaks) - 1):
-        forMedian.append(allPeaks[i + 1] - allPeaks[i])
+        forMedian.append(allPeaks[i+1] - allPeaks[i])
     forMedian = [rounding(x, 50) for x in forMedian]
     medianDistance = np.median(forMedian)
     return sorted(list(set(allPeaks))), medianDistance
 
-def split_SW(name, seq1, seq2, rc):
+def split_SW(name, seq1, seq2):
     '''
     I think there's some redundancy here that I can change or make more efficient
     '''
@@ -264,18 +272,18 @@ def split_SW(name, seq1, seq2, rc):
         align_file2.close()
 
         diagonal = 'no'
-        if step == 0 and not rc:
+        if step == 0:
             diagonal = 'yes'
 
         x_limit1 = len(seq3)
         y_limit1 = len(seq4)
 
-        os.system('%s -asequence seq3.fasta -bsequence seq4.fasta\
+        os.system('%s -asequence seq3.fasta -bsequence seq4.fasta \
                   -datafile EDNAFULL -gapopen 25 -outfile align.whatever \
                   -gapextend 1  %s %s %s >./sw.txt 2>&1' \
                   %(water, diagonal, x_limit1, y_limit1))
         matrix_file = 'SW_PARSE.txt'
-        diag_set, diag_dict = parse_file(matrix_file, rc, len(seq1), step)
+        diag_set, diag_dict = parse_file(matrix_file, len(seq1), step)
         os.system('rm SW_PARSE.txt')
 
     diag_set = sorted(list(diag_set))
@@ -284,10 +292,9 @@ def split_SW(name, seq1, seq2, rc):
         plot_list.append(diag_dict[diag])
     return plot_list
 
-def parse_file(matrix_file, rc, seq_length, step):
+def parse_file(matrix_file, seq_length, step):
     '''
     matrix_file : watHerON output file
-    rc : bool, not sure what it is <- I don't think this is even doing anything
     seq_length : int, length of the sequence
     step : int, some position
     Returns:
@@ -297,9 +304,8 @@ def parse_file(matrix_file, rc, seq_length, step):
     diag_dict, diag_set = {}, set()
     for line in open(matrix_file):
         line = line.strip().split(':')
-        position = int(line[0]) + step
-        if not rc: # this will always happen
-            position = np.abs(position)
+        # position = int(line[0]) + step
+        position = np.abs(position)
         value = int(line[1]) # actual score
         diag_set.add(position)
         try:
@@ -323,7 +329,9 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
         repeats = split_read(peaks, seq, out_F, qual, out_Fq, name)
 
         PIR = temp_folder + '/' + name + 'alignment.fasta'
-        os.system('%s -read_fasta %s -hb -pir %s -do_progressive %s >./poa_messages.txt 2>&1' %(poa, out_F, PIR, score_matrix))
+        os.system('%s -read_fasta %s -hb -pir %s \
+                  -do_progressive %s >./poa_messages.txt 2>&1' \
+                  %(poa, out_F, PIR, score_matrix))
         reads = read_fasta(PIR)
 
         if repeats == '2':
@@ -332,17 +340,23 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
                 if 'CONSENS' not in read:
                     Qual_Fasta.write('>' + read + '\n' + reads[read] + '\n')
             Qual_Fasta.close()
-            os.system('%s %s %s %s >> %s' %(consensus, pairwise, out_Fq, name, poa_cons))
+            os.system('%s %s %s %s >> %s' \
+                      %(consensus, pairwise, out_Fq, name, poa_cons))
 
         else:
             for read in reads:
               if 'CONSENS0' in read:
                 out_cons_file = open(poa_cons, 'w')
-                out_cons_file.write('>' + name + '\n' + reads[read].replace('-', '') + '\n')
+                out_cons_file.write('>' + name + '\n' \
+                                    + reads[read].replace('-', '') + '\n')
                 out_cons_file.close()
 
-        os.system('%s --secondary=no -ax map-ont %s %s > %s 2> ./minimap2_messages.txt'% (minimap2, poa_cons, out_Fq, overlap))
-        os.system('%s --sam --bq 0 -t 1 %s %s %s %s > ./racon_messages.txt 2>&1' %(racon,out_Fq, overlap, poa_cons, final))
+        os.system('%s --secondary=no -ax map-ont \
+                  %s %s > %s 2> ./minimap2_messages.txt' \
+                  % (minimap2, poa_cons, out_Fq, overlap))
+        os.system('%s --sam --bq 0 -t 1 \
+                  %s %s %s %s > ./racon_messages.txt 2>&1' \
+                  %(racon,out_Fq, overlap, poa_cons, final))
 
         reads = read_fasta(final)
         for read in reads:
@@ -392,16 +406,22 @@ def analyze_reads(read_list):
         if 1000 < seq_length:
             final_consensus = ''
             # score lists are made for sequence before and after the seed
-            score_lists_f = split_SW(name, seq[seed:], seq[seed:], False)
-            score_lists_r = split_SW(name, revComp(seq[:seed]), revComp(seq[:seed]), False)
+            forward = seq[seed:]
+            score_list_f = split_SW(name, forward, forward)
+            reverse = revComp(seq[:seed])
+            score_list_r = split_SW(name, reverse, reverse)
             # calculate where peaks are and the median distance between them
-            peaks, median_distance = callPeaks(score_lists_f, score_lists_r, seed)
+            peaks, median_distance = callPeaks(score_list_f, score_list_r, seed)
             print(name, seq_length, peaks)
-            final_consensus, repeats1 = determine_consensus(name, seq, peaks, qual, median_distance)
+            final_consensus, repeats1 = determine_consensus(name, seq, peaks, \
+                                                            qual, median_distance)
             # output the consensus sequence
             if final_consensus:
                 final_out = open(out_file, 'a')
-                final_out.write('>' + name + '_' + str(round(average_quals, 2)) + '_' + str(seq_length) + '_' + str(repeats1) + '_' + str(len(final_consensus)))
+                final_out.write('>' + name + '_' \
+                                + str(round(average_quals, 2)) + '_' \
+                                + str(seq_length) + '_' + str(repeats1) \
+                                + '_' + str(len(final_consensus)))
                 final_out.write('\n' + final_consensus + '\n')
                 final_out.close()
                 os.system('rm -rf ' + temp_folder)
