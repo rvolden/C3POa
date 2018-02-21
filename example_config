@@ -1,0 +1,5 @@
+# Tab separate program name from path to executable
+poa /bio-pipeline/poaV2/poa
+racon   /racon/bin/racon
+water   /EMBOSS-6.6.0/emboss/water
+minimap /minimap2/minimap2
