@@ -65,15 +65,15 @@ def configReader(configIn):
     progs.sort(key = lambda x: x.split('/')[-1])
     return progs[0], progs[1], progs[2], progs[3]
 
-arguments = argParser()
-if arguments['config']:
-    minimap2, poa, racon, water = configReader(arguments['config'])
+args = argParser()
+if args['config']:
+    minimap2, poa, racon, water = configReader(args['config'])
 consensus = 'python3 consensus.py'
 temp_folder = 'tmp1'
-path = arguments['path']
-input_file = arguments['reads']
-score_matrix = arguments['matrix']
-out_file = arguments['output']
+path = args['path']
+input_file = args['reads']
+score_matrix = args['matrix']
+out_file = args['output']
 subread_file = 'subreads.fastq'
 os.chdir(path)
 sub = open(path + '/' + subread_file, 'w')
