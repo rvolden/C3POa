@@ -17,4 +17,13 @@ chmod +x setup.sh
 ```
 
 To install NumPy, you can go [here](https://scipy.org/install.html).  
-Otherwise,
+Otherwise, you can use your computer's package manager (apt-get, dnf, brew, etc.) to install.  
+Pip3 is another option for NumPy installation.  
+Example:
+```
+sudo dnf install python3-numpy
+```
+or
+```
+pip3 install numpy
+```
