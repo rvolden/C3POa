@@ -19,6 +19,7 @@ cd minimap2 && make
 cd $cwd
 
 echo 'water'
+wget https://users.soe.ucsc.edu/~rvolden/C3POa/EMBOSS-6.6.0_v8.tar.gz
 tar -xzf EMBOSS-6.6.0_v8.tar.gz
 cd EMBOSS-6.6.0
 ./configure --prefix=/usr/local/emboss
