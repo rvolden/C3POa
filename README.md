@@ -9,9 +9,12 @@ Computational pipeline for calling consensi on R2C2 nanopore data.
 - minimap2 2.7-r654
 - racon
 
-To install dependencies, use setup.sh.
-setup.sh will download and make all of the packages that you need to run C3POa (except python and numpy).
+To install dependencies, use setup.sh.  
+setup.sh will download and make all of the packages that you need to run C3POa (except Python and NumPy).
 ```
 chmod +x setup.sh
 ./setup.sh
 ```
+
+To install NumPy, you can go [here](https://scipy.org/install.html).  
+Otherwise,
