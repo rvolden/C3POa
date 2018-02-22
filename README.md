@@ -10,7 +10,8 @@ Computational pipeline for calling consensi on R2C2 nanopore data.
 - racon
 
 To install dependencies, use setup.sh.  
-setup.sh will download and make all of the packages that you need to run C3POa (except Python and NumPy).
+setup.sh will download and make all of the packages that you need to run C3POa (except Python and NumPy).  
+You don't need to have these in your PATH, but if you don't, you'll need to use a config [file](example_config)
 ```
 chmod +x setup.sh
 ./setup.sh
