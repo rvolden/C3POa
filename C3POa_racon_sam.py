@@ -18,6 +18,9 @@ Dependencies:
     poa v1.0.0 Revision: 1.2.2.9
     EMBOSS water: watHerON v8
     minimap2 2.7-r654
+    racon
+
+Add option with parsed subreads, don't do sw, just do poa/racon
 '''
 
 import os
@@ -25,30 +28,45 @@ import sys
 import numpy as np
 import argparse
 
+# Parses arguments
 parser = argparse.ArgumentParser(description = 'Makes consensus sequences \
                                                 from R2C2 reads.',
                                  add_help = True,
                                  prefix_chars = '-')
-required = parser.add_argument_group('Required arguments')
+required = parser.add_argument_group('required arguments')
 required.add_argument('--reads', '-r', type=str, action='store', required=True, \
                       help='FASTQ file that contains the long R2C2 reads.')
 parser.add_argument('--path', '-p', type=str, action='store', default=os.getcwd(), \
-                    help='Directory where all the files are/where they will end up.')
+                    help='Directory where all the files are/where they will end up.\
+                          Defaults to your current directory.')
+parser.add_argument('--matrix', '-m', type=str, action='store', \
+                    default='NUC.4.4.mat', \
+                    help='Score matrix to use for poa.\
+                          Defaults to NUC.4.4.mat.')
+parser.add_argument('--config', '-c', type=str, action='store', default='', \
+                    help='If you want to use a config file to specify paths to\
+                          programs, specify them here. Use for poa, racon, water,\
+                          and minimap2 if they are not in your path.')
+parser.add_argument('--output', '-o', type=str, action='store', \
+                    default='R2C2_Consensus.fasta', \
+                    help='FASTA file that the consensus gets written to.\
+                          Defaults to R2C2_Consensus.fasta')
 arguments = vars(parser.parse_args())
 
 poa = 'poa'
-score_matrix = '/home/vollmers/scripts/NUC.4.4.mat'
-water = '/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water'
-consensus = 'python3 /home/vollmers/scripts/consensus.py'
+water = '/home/rvolden/Documents/Vollmers_Lab/Library_Prep/\
+         R2C2_data/score_matrices/pipeline/EMBOSS-6.6.0/emboss/water'
+consensus = 'python3 consensus.py'
 minimap2 = 'minimap2'
 racon = '/home/vollmers/scripts/racon/bin/racon'
 
 temp_folder = 'tmp1'
 path = arguments['path']
 input_file = arguments['reads']
-os.chdir(path)
-out_file = 'R2C2_Consensus.fasta'
+score_matrix = arguments['matrix']
+out_file = arguments['output']
 subread_file = 'subreads.fastq'
+os.chdir(path)
 sub = open(path + '/' + subread_file, 'w')
 os.system('rm -r ' + temp_folder)
 os.system('mkdir ' + temp_folder)
