@@ -10,7 +10,7 @@ peaks in alignment scores, splitting reads, aligning those to each other,
 and giving back a consensus sequence.
 
 Usage:
-    python3 C3POa_racon_sam.py --reads reads.fastq [--path /current/directory]
+    python3 C3POa.py --reads reads.fastq [--path /current/directory]
 
 Dependencies:
     Python 3.6
