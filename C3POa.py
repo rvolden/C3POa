@@ -167,7 +167,6 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
     plt.style.use('BME163')
     plt.figure(figsize = (10, 5))
     hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
-    # print(scoreList_F, len(scoreList_F), '\n', scoreList_R, len(scoreList_R))
 
     xlist = [x for x in range(0, len(filtered_peaks))]
     hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), lw = 1, zorder = 550)
@@ -206,9 +205,8 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
         except IndexError:
             pass
 
-    # hist.set_ylim(min(filtered_peaks)*1.1, ylim)
-    hist.set_ylim(-1000000, 1000000)
-    hist.set_xlim(0, 12000) # seed, xlim
+    hist.set_ylim(min(filtered_peaks)*1.1, ylim)
+    hist.set_xlim(0, xlim) # seed, xlim
     hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
     hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
     hist.tick_params(axis='both',which='both',\
