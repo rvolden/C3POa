@@ -420,7 +420,11 @@ def read_fastq_file(seq_file):
             quals.append(number)
         average_quals = np.average(quals)
         seq_length = len(seq)
-        read_list.append((name, seed, seq, qual, average_quals, seq_length))
+        if seed == seq_length:
+            lineNum += 4
+            continue
+        else:
+            read_list.append((name, seed, seq, qual, average_quals, seq_length))
         lineNum += 4
     return read_list
 
