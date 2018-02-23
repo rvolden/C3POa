@@ -314,7 +314,6 @@ def split_SW(name, seq1, seq2):
         diag_set, diag_dict = parse_file(matrix_file, len(seq1), step)
         os.system('rm SW_PARSE.txt')
 
-    diag_set = sorted(list(diag_set))
     plot_list = []
     for diag in diag_set:
         plot_list.append(diag_dict[diag])
@@ -340,7 +339,7 @@ def parse_file(matrix_file, seq_length, step):
             diag_dict[position] += value
         except:
             diag_dict[position] = value
-    return diag_set, diag_dict
+    return sorted(list(diag_set)), diag_dict
 
 def determine_consensus(name, seq, peaks, qual, median_distance):
     '''Aligns and returns the consensus'''
