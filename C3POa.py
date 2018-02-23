@@ -332,7 +332,7 @@ def parse_file(matrix_file, seq_length, step):
     diag_dict, diag_set = {}, set()
     for line in open(matrix_file):
         line = line.strip().split(':')
-        # position = int(line[0]) + step
+        position = int(line[0]) + step
         position = np.abs(position)
         value = int(line[1]) # actual score
         diag_set.add(position)
