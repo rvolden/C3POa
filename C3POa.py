@@ -52,6 +52,8 @@ def argParser():
                         default='R2C2_Consensus.fasta', \
                         help='FASTA file that the consensus gets written to.\
                               Defaults to R2C2_Consensus.fasta')
+    parser.add_argument('--figure', '-f', type=bool, action='store', default=False, \
+                        help='Set to true if you want to output a histogram of scores.')
     return vars(parser.parse_args())
 
 def configReader(configIn):
@@ -74,6 +76,7 @@ path = args['path']
 input_file = args['reads']
 score_matrix = args['matrix']
 out_file = args['output']
+figure = args['figure']
 subread_file = 'subreads.fastq'
 os.chdir(path)
 sub = open(path + '/' + subread_file, 'w')
@@ -156,6 +159,64 @@ def read_fasta(inFile):
 def rounding(x, base):
     '''Rounds to the nearest base, we use 50'''
     return int(base * round(float(x)/base))
+
+def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mplpatches
+    plt.style.use('BME163')
+    plt.figure(figsize = (10, 5))
+    hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
+
+    xlist = [x for x in range(0, len(filtered_peaks))]
+    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), lw = 1, zorder = 550)
+    ylim = max(scoreList_F) * 1.1
+    xlim = (len(scoreList_F) + seed)
+    wholeSeq = mplpatches.Rectangle((0, -15000), xlim, 30000, lw = 0, fc = 'grey', zorder = 1000)
+    hist.add_patch(wholeSeq)
+
+    for i in range(seed, xlim):
+        if np.in1d(i, peakList_R):
+            color = (0.3, 0.3, 0.3)
+            if i == seed:
+                color = 'black'
+            bar1 = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim, lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
+            hist.add_patch(bar1) # 253/255, 177/255, 85/255
+            splint = mplpatches.Rectangle((i-150, -15000), 300, 30000, lw = 0, fc = color, zorder = 1100)
+            hist.add_patch(splint)
+        else:
+            bar3 = mplpatches.Rectangle((i, 0), 3, scoreList_F[i-seed], lw = 0, \
+                                       facecolor = (0, 191/255, 165/255), zorder = 100)
+            hist.add_patch(bar3)
+    print(len(scoreList_R), seed)
+    for j in range(len(scoreList_R), 1, -1):
+        if np.in1d(j, peakList_R):
+            color = (0.3, 0.3, 0.3)
+            if i == seed:
+                color = 'black'
+            bar5 = mplpatches.Rectangle((j-12.5, 0), 25, -ylim, lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
+            hist.add_patch(bar5)
+            splint = mplpatches.Rectangle((j-150, -15000), 300, 30000, lw = 0, fc = color, zorder = 1100)
+            hist.add_patch(splint)
+        try:
+            bar6 = mplpatches.Rectangle((j, 0), 3, -scoreList_R[seed-j], lw = 0, \
+                                       facecolor = (0, 191/255, 165/255), zorder = 100)
+            hist.add_patch(bar6)
+        except IndexError:
+            pass
+
+    hist.set_ylim(min(filtered_peaks)*1.1, ylim)
+    hist.set_xlim(0, xlim) # seed, xlim
+    hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
+    hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
+    hist.tick_params(axis='both',which='both',\
+                     bottom='on', labelbottom='on',\
+                     left='on', labelleft='on',\
+                     right='off', labelright='off',\
+                     top='off', labeltop='off')
+
+    plt.savefig('inverseTest_1' + '.png', dpi = 600)
+    plt.close()
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False):
     '''
@@ -275,6 +336,13 @@ def callPeaks(scoreListF, scoreListR, seed):
                                 rate = 1, returnScoreList = False)
         peaksRAdj = list(seed - np.array(peaksR))
         allPeaks += peaksRAdj
+
+    smoothedPeaks = []
+    smoothedPeaks += [-x for x in smoothedScoresR[::-1]]
+    smoothedPeaks += smoothedScoresF
+
+    if figure:
+        return sorted(list(set(allPeaks))), smoothedPeaks
 
     # calculates the median distance between detected peaks
     forMedian = []
@@ -444,6 +512,9 @@ def analyze_reads(read_list):
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(score_list_f, score_list_r, seed)
             print(name, seq_length, peaks)
+            if figure:
+                makeFig(score_list_f, score_list_r, peaks, seed, median_distance)
+            sys.exit()
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, \
                                                             qual, median_distance)
             # output the consensus sequence
