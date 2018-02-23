@@ -167,6 +167,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
     plt.style.use('BME163')
     plt.figure(figsize = (10, 5))
     hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
+    # print(scoreList_F, len(scoreList_F), '\n', scoreList_R, len(scoreList_R))
 
     xlist = [x for x in range(0, len(filtered_peaks))]
     hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), lw = 1, zorder = 550)
@@ -205,8 +206,9 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
         except IndexError:
             pass
 
-    hist.set_ylim(min(filtered_peaks)*1.1, ylim)
-    hist.set_xlim(0, xlim) # seed, xlim
+    # hist.set_ylim(min(filtered_peaks)*1.1, ylim)
+    hist.set_ylim(-1000000, 1000000)
+    hist.set_xlim(0, 12000) # seed, xlim
     hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
     hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
     hist.tick_params(axis='both',which='both',\
@@ -275,7 +277,16 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False
             dec = all(slopes[i+x] < 0 for x in range(1, la))
             if slopes[i] > 0 and dec:
                 peaks.append(i)
-    return peaks
+
+    finalPeaks = []
+    for i in range(1, len(peaks)):
+        if i == 1:
+            finalPeaks.append(peaks[i-1])
+        if peaks[i-1] < peaks[i] < peaks[i-1] + 200:
+            continue
+        else:
+            finalPeaks.append(peaks[i])
+    return finalPeaks
 
 def callPeaks(scoreListF, scoreListR, seed):
     '''
@@ -338,8 +349,12 @@ def callPeaks(scoreListF, scoreListR, seed):
         allPeaks += peaksRAdj
 
     smoothedPeaks = []
-    smoothedPeaks += [-x for x in smoothedScoresR[::-1]]
-    smoothedPeaks += smoothedScoresF
+    for thing in [-x for x in smoothedScoresR[::-1]]:
+        smoothedPeaks.append(thing)
+    # smoothedPeaks += [-x for x in smoothedScoresR[::-1]]
+    for thing in smoothedScoresF:
+        smoothedPeaks.append(thing)
+    # smoothedPeaks += smoothedScoresF
 
     if figure:
         return sorted(list(set(allPeaks))), smoothedPeaks
@@ -356,6 +371,7 @@ def split_SW(name, seq1, seq2):
     '''
     I think there's some redundancy here that I can change or make more efficient
     '''
+    diag_dict, diag_set = {}, set()
     for step in range(0, len(seq1), 1000):
         seq3 = seq1[step:min(len(seq1), step + 1000)]
         seq4 = seq2[:1000]
@@ -375,19 +391,20 @@ def split_SW(name, seq1, seq2):
         y_limit1 = len(seq4)
 
         os.system('%s -asequence seq3.fasta -bsequence seq4.fasta \
-                  -datafile EDNAFULL -gapopen 25 -outfile align.whatever \
+                  -datafile EDNAFULL -gapopen 25 -outfile %s/align.whatever \
                   -gapextend 1  %s %s %s >./sw.txt 2>&1' \
-                  %(water, diagonal, x_limit1, y_limit1))
+                  %(water, temp_folder, diagonal, x_limit1, y_limit1))
         matrix_file = 'SW_PARSE.txt'
-        diag_set, diag_dict = parse_file(matrix_file, len(seq1), step)
+        diag_set, diag_dict = parse_file(matrix_file, len(seq1), step, \
+                                         diag_set, diag_dict)
         os.system('rm SW_PARSE.txt')
-
+    diag_set = sorted(list(diag_set))
     plot_list = []
     for diag in diag_set:
         plot_list.append(diag_dict[diag])
     return plot_list
 
-def parse_file(matrix_file, seq_length, step):
+def parse_file(matrix_file, seq_length, step, diag_set, diag_dict):
     '''
     matrix_file : watHerON output file
     seq_length : int, length of the sequence
@@ -396,7 +413,6 @@ def parse_file(matrix_file, seq_length, step):
         diag_set : set, positions
         diag_dict : dict, position : diagonal alignment scores
     '''
-    diag_dict, diag_set = {}, set()
     for line in open(matrix_file):
         line = line.strip().split(':')
         position = int(line[0]) + step
@@ -407,7 +423,7 @@ def parse_file(matrix_file, seq_length, step):
             diag_dict[position] += value
         except:
             diag_dict[position] = value
-    return sorted(list(diag_set)), diag_dict
+    return diag_set, diag_dict
 
 def determine_consensus(name, seq, peaks, qual, median_distance):
     '''Aligns and returns the consensus'''
