@@ -135,7 +135,7 @@ def read_fasta(inFile):
     '''Reads in FASTA files, returns a dict of header:sequence'''
     readDict = {}
     tempSeqs, headers, sequences = [], [], []
-    for line in inFile:
+    for line in open(inFile):
         line = line.rstrip()
         if not line:
             continue
