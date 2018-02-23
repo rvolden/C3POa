@@ -148,6 +148,7 @@ def read_fasta(inFile):
         else:
             tempSeqs.append(line)
     sequences.append(''.join(tempSeqs).upper())
+    sequences = sequences[1:]
     for i in range(len(headers)):
         readDict[headers[i]] = sequences[i]
     return readDict
