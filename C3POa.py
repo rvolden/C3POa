@@ -70,6 +70,8 @@ def configReader(configIn):
 args = argParser()
 if args['config']:
     minimap2, poa, racon, water = configReader(args['config'])
+else:
+    minimap2, poa, racon, water = 'minimap2', 'poa', 'racon', 'water'
 consensus = 'python3 consensus.py'
 temp_folder = 'tmp1'
 path = args['path']
