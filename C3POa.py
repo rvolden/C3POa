@@ -65,16 +65,17 @@ def configReader(configIn):
         line = line.rstrip()
         progs.append(line)
     progs.sort(key = lambda x: x.split('/')[-1])
-    return progs[0], progs[1], progs[2], progs[3]
+    return progs[0], progs[1], progs[2], progs[3],progs[4]
 
 args = argParser()
 if args['config']:
-    minimap2, poa, racon, water = configReader(args['config'])
+    consensus, minimap2, poa, racon, water = configReader(args['config'])
 else:
-    minimap2, poa, racon, water = 'minimap2', 'poa', 'racon', 'water'
-consensus = 'python3 consensus.py'
-temp_folder = 'tmp1'
+    consensus,minimap2, poa, racon, water = 'consensus.py', 'minimap2', 'poa', 'racon', 'water'
+
+consensus = 'python3 '+consensus
 path = args['path']
+temp_folder = path+'/'+'tmp1'
 input_file = args['reads']
 score_matrix = args['matrix']
 out_file = args['output']
@@ -112,24 +113,26 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
             out_F.write('>' + str(i + 1) + '\n' \
                         + sequence[split1:split2] + '\n')
             out_Fq.write('@' + str(i + 1) + '\n' \
-                         + sequence[split1:split2] + '\n + \n' \
+                         + sequence[split1:split2] + '\n+\n' \
                          + qual[split1:split2] + '\n')
             sub.write('@' + name + '_' + str(i + 1) +' \n' \
-                      + sequence[split1:split2] + '\n + \n' \
+                      + sequence[split1:split2] + '\n+\n' \
                       + qual[split1:split2] + '\n')
 
-    if len(sequence[:split_list[0]]) > 50 and len(sequence[split2:]) > 50:
+    if len(sequence[:split_list[0]]) > 50: 
         out_Fq.write('@' + str(0) + '\n' \
-                     + sequence[0:split_list[0]] + '\n + \n' \
+                     + sequence[0:split_list[0]] + '\n+\n' \
                      + qual[0:split_list[0]] + '\n')
         sub.write('@' + name + '_' + str(0) + '\n' \
-                  + sequence[0:split_list[0]] + '\n + \n' \
+                  + sequence[0:split_list[0]] + '\n+\n' \
                   + qual[0:split_list[0]] + '\n')
+
+    if len(sequence[split2:]) > 50:
         out_Fq.write('@' + str(i + 2) + '\n' \
-                     + sequence[split2:] + '\n + \n' \
+                     + sequence[split2:] + '\n+\n' \
                      + qual[split2:] + '\n')
         sub.write('@' + name + '_' + str(i + 2) + '\n' \
-                  + sequence[split2:] + '\n + \n' \
+                  + sequence[split2:] + '\n+\n' \
                   + qual[split2:] + '\n')
     repeats = str(int(i + 1))
     out_F.close()
@@ -158,6 +161,7 @@ def read_fasta(inFile):
         readDict[headers[i]] = sequences[i]
     return readDict
 
+
 def rounding(x, base):
     '''Rounds to the nearest base, we use 50'''
     return int(base * round(float(x)/base))
@@ -166,7 +170,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import matplotlib.patches as mplpatches
-    plt.style.use('BME163')
+#    plt.style.use('BME163')
     plt.figure(figsize = (10, 5))
     hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
 
@@ -219,6 +223,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
 
     plt.savefig('inverseTest_1' + '.png', dpi = 600)
     plt.close()
+    sys.exit()
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False):
     '''
@@ -278,15 +283,8 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False
             if slopes[i] > 0 and dec:
                 peaks.append(i)
 
-    finalPeaks = []
-    for i in range(1, len(peaks)):
-        if i == 1:
-            finalPeaks.append(peaks[i-1])
-        if peaks[i-1] < peaks[i] < peaks[i-1] + 200:
-            continue
-        else:
-            finalPeaks.append(peaks[i])
-    return finalPeaks
+
+    return peaks
 
 def callPeaks(scoreListF, scoreListR, seed):
     '''
@@ -355,17 +353,35 @@ def callPeaks(scoreListF, scoreListR, seed):
     for thing in smoothedScoresF:
         smoothedPeaks.append(thing)
     # smoothedPeaks += smoothedScoresF
+    
+
+
+    sorted_allPeaks_list=sorted(list(set(allPeaks)))
+
+    sorted_finalPeaks_list = []
+    for i in range(0, len(sorted_allPeaks_list)):    ############## Changed this. Don't know why you started at 1
+        if i == 0:     
+            sorted_finalPeaks_list.append(sorted_allPeaks_list[i])
+        elif sorted_allPeaks_list[i-1] < sorted_allPeaks_list[i] < sorted_allPeaks_list[i-1] + 200:
+            continue
+        else:
+            sorted_finalPeaks_list.append(sorted_allPeaks_list[i])
+
+#    print(sorted_allPeaks_list,sorted_finalPeaks_list)
+
 
     if figure:
-        return sorted(list(set(allPeaks))), smoothedPeaks
+        return sorted_finalPeaks_list, smoothedPeaks
+
 
     # calculates the median distance between detected peaks
     forMedian = []
-    for i in range(len(allPeaks) - 1):
-        forMedian.append(allPeaks[i+1] - allPeaks[i])
+    for i in range(len(sorted_finalPeaks_list) - 1):
+        forMedian.append(sorted_finalPeaks_list[i+1] - sorted_finalPeaks_list[i])
     forMedian = [rounding(x, 50) for x in forMedian]
     medianDistance = np.median(forMedian)
-    return sorted(list(set(allPeaks))), medianDistance
+
+    return sorted_finalPeaks_list, medianDistance
 
 def split_SW(name, seq1, seq2):
     '''
@@ -391,13 +407,17 @@ def split_SW(name, seq1, seq2):
         y_limit1 = len(seq4)
 
         os.system('%s -asequence seq3.fasta -bsequence seq4.fasta \
-                  -datafile EDNAFULL -gapopen 25 -outfile %s/align.whatever \
+                  -datafile EDNAFULL -gapopen 25 -outfile=%s/align.whatever \
                   -gapextend 1  %s %s %s >./sw.txt 2>&1' \
                   %(water, temp_folder, diagonal, x_limit1, y_limit1))
+#        if name == '94e1d9da-5942-4782-b50b-f4ba42bdbbde':
+#            sys.exit()
         matrix_file = 'SW_PARSE.txt'
+        ##### THERE'S SOMETHING WRONG HERE WHERE SW_PARSE IS EMPTY AFTER THE FIRST READ
+
         diag_set, diag_dict = parse_file(matrix_file, len(seq1), step, \
                                          diag_set, diag_dict)
-        os.system('rm SW_PARSE.txt')
+        os.system('rm SW_PARSE.txt SW_PARSE_PARTIAL.txt sw.txt')
     diag_set = sorted(list(diag_set))
     plot_list = []
     for diag in diag_set:
@@ -429,14 +449,15 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
     '''Aligns and returns the consensus'''
     repeats = ''
     corrected_consensus = ''
+#    print(name,peaks,median_distance)
     if median_distance > 500 and len(peaks) > 1:
+
         out_F = temp_folder + '/' + name + '_F.fasta'
         out_Fq = temp_folder + '/' + name + '_F.fastq'
         poa_cons = temp_folder + '/' + name + '_consensus.fasta'
         final = temp_folder + '/' + name + '_corrected_consensus.fasta'
         overlap = temp_folder +'/' + name + '_overlaps.sam'
         pairwise = temp_folder + '/' + name + '_prelim_consensus.fasta'
-
         repeats = split_read(peaks, seq, out_F, qual, out_Fq, name)
 
         PIR = temp_folder + '/' + name + 'alignment.fasta'
@@ -462,13 +483,28 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
                                     + reads[read].replace('-', '') + '\n')
                 out_cons_file.close()
 
-        os.system('%s --secondary=no -ax map-ont \
-                  %s %s > %s 2> ./minimap2_messages.txt' \
-                  % (minimap2, poa_cons, out_Fq, overlap))
-        os.system('%s --sam --bq 0 -t 1 \
-                  %s %s %s %s > ./racon_messages.txt 2>&1' \
-                  %(racon,out_Fq, overlap, poa_cons, final))
+        final=poa_cons
+        for i in np.arange(1,2,1):
+            try:
+                if i==1:
+                    input_cons=poa_cons
+                    output_cons=poa_cons.replace('.fasta','_'+str(i)+'.fasta')
+                else:
+                    input_cons=poa_cons.replace('.fasta','_'+str(i-1)+'.fasta')
+                    output_cons=poa_cons.replace('.fasta','_'+str(i)+'.fasta')
 
+                os.system('%s --secondary=no -ax map-ont \
+                          %s %s > %s 2> ./minimap2_messages.txt' \
+                          % (minimap2, input_cons, out_Fq, overlap))
+
+                os.system('%s --sam --bq 5 -t 1 \
+                          %s %s %s %s > ./racon_messages.txt 2>&1' \
+                          %(racon,out_Fq, overlap, input_cons, output_cons))
+                final=output_cons
+            except:
+                pass
+
+        print(final)    
         reads = read_fasta(final)
         for read in reads:
             corrected_consensus = reads[read]
@@ -527,10 +563,9 @@ def analyze_reads(read_list):
             score_list_r = split_SW(name, reverse, reverse)
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(score_list_f, score_list_r, seed)
-            print(name, seq_length, peaks)
+            
             if figure:
                 makeFig(score_list_f, score_list_r, peaks, seed, median_distance)
-            sys.exit()
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, \
                                                             qual, median_distance)
             # output the consensus sequence
@@ -542,7 +577,7 @@ def analyze_reads(read_list):
                                 + '_' + str(len(final_consensus)))
                 final_out.write('\n' + final_consensus + '\n')
                 final_out.close()
-                os.system('rm -rf ' + temp_folder)
+                os.system('rm ' + temp_folder+'/*')
 
 def main():
     '''Controls the flow of the program'''
