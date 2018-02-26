@@ -174,10 +174,12 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
     hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
 
     xlist = [x for x in range(0, len(filtered_peaks))]
-    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), lw = 1, zorder = 550)
+    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), \
+              lw = 1, zorder = 550)
     ylim = max(scoreList_F) * 1.1
     xlim = (len(scoreList_F) + seed)
-    wholeSeq = mplpatches.Rectangle((0, -15000), xlim, 30000, lw = 0, fc = 'grey', zorder = 1000)
+    wholeSeq = mplpatches.Rectangle((0, -15000), xlim, 30000, lw = 0, \
+                                    fc = 'grey', zorder = 1000)
     hist.add_patch(wholeSeq)
 
     for i in range(seed, xlim):
@@ -185,9 +187,11 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
             color = (0.3, 0.3, 0.3)
             if i == seed:
                 color = 'black'
-            bar1 = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim, lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
+            bar1 = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim, \
+                                        lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
             hist.add_patch(bar1) # 253/255, 177/255, 85/255
-            splint = mplpatches.Rectangle((i-150, -15000), 300, 30000, lw = 0, fc = color, zorder = 1100)
+            splint = mplpatches.Rectangle((i-150, -15000), 300, 30000, \
+                                          lw = 0, fc = color, zorder = 1100)
             hist.add_patch(splint)
         else:
             bar3 = mplpatches.Rectangle((i, 0), 3, scoreList_F[i-seed], lw = 0, \
@@ -199,9 +203,11 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
             color = (0.3, 0.3, 0.3)
             if i == seed:
                 color = 'black'
-            bar5 = mplpatches.Rectangle((j-12.5, 0), 25, -ylim, lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
+            bar5 = mplpatches.Rectangle((j-12.5, 0), 25, -ylim, lw = 0, \
+                                        fc = (0.96, 0.43, 0.2), zorder = 0)
             hist.add_patch(bar5)
-            splint = mplpatches.Rectangle((j-150, -15000), 300, 30000, lw = 0, fc = color, zorder = 1100)
+            splint = mplpatches.Rectangle((j-150, -15000), 300, 30000, lw = 0, \
+                                          fc = color, zorder = 1100)
             hist.add_patch(splint)
         try:
             bar6 = mplpatches.Rectangle((j, 0), 3, -scoreList_R[seed-j], lw = 0, \
