@@ -73,9 +73,9 @@ if args['config']:
 else:
     consensus,minimap2, poa, racon, water = 'consensus.py', 'minimap2', 'poa', 'racon', 'water'
 
-consensus = 'python3 '+consensus
+consensus = 'python3 ' + consensus
 path = args['path']
-temp_folder = path+'/'+'tmp1'
+temp_folder = path + '/' + 'tmp1'
 input_file = args['reads']
 score_matrix = args['matrix']
 out_file = args['output']
@@ -119,7 +119,7 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
                       + sequence[split1:split2] + '\n+\n' \
                       + qual[split1:split2] + '\n')
 
-    if len(sequence[:split_list[0]]) > 50: 
+    if len(sequence[:split_list[0]]) > 50:
         out_Fq.write('@' + str(0) + '\n' \
                      + sequence[0:split_list[0]] + '\n+\n' \
                      + qual[0:split_list[0]] + '\n')
@@ -160,7 +160,6 @@ def read_fasta(inFile):
     for i in range(len(headers)):
         readDict[headers[i]] = sequences[i]
     return readDict
-
 
 def rounding(x, base):
     '''Rounds to the nearest base, we use 50'''
@@ -212,7 +211,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
             pass
 
     hist.set_ylim(min(filtered_peaks)*1.1, ylim)
-    hist.set_xlim(0, xlim) # seed, xlim
+    hist.set_xlim(0, xlim)
     hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
     hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
     hist.tick_params(axis='both',which='both',\
@@ -227,7 +226,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False):
     '''
-    Smooths over data using a Ssavitzky Golay filter
+    Smooths over data using a Savitzky Golay filter
     This can either return a list of scores, or a list of peaks
 
     y : array-like, score list
@@ -282,8 +281,6 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False
             dec = all(slopes[i+x] < 0 for x in range(1, la))
             if slopes[i] > 0 and dec:
                 peaks.append(i)
-
-
     return peaks
 
 def callPeaks(scoreListF, scoreListR, seed):
@@ -353,34 +350,25 @@ def callPeaks(scoreListF, scoreListR, seed):
     for thing in smoothedScoresF:
         smoothedPeaks.append(thing)
     # smoothedPeaks += smoothedScoresF
-    
-
-
-    sorted_allPeaks_list=sorted(list(set(allPeaks)))
+    sorted_allPeaks_list = sorted(list(set(allPeaks)))
 
     sorted_finalPeaks_list = []
-    for i in range(0, len(sorted_allPeaks_list)):    ############## Changed this. Don't know why you started at 1
-        if i == 0:     
+    for i in range(0, len(sorted_allPeaks_list)):
+        if i == 0:
             sorted_finalPeaks_list.append(sorted_allPeaks_list[i])
         elif sorted_allPeaks_list[i-1] < sorted_allPeaks_list[i] < sorted_allPeaks_list[i-1] + 200:
             continue
         else:
             sorted_finalPeaks_list.append(sorted_allPeaks_list[i])
-
 #    print(sorted_allPeaks_list,sorted_finalPeaks_list)
-
-
     if figure:
         return sorted_finalPeaks_list, smoothedPeaks
-
-
     # calculates the median distance between detected peaks
     forMedian = []
     for i in range(len(sorted_finalPeaks_list) - 1):
         forMedian.append(sorted_finalPeaks_list[i+1] - sorted_finalPeaks_list[i])
     forMedian = [rounding(x, 50) for x in forMedian]
     medianDistance = np.median(forMedian)
-
     return sorted_finalPeaks_list, medianDistance
 
 def split_SW(name, seq1, seq2):
@@ -410,11 +398,7 @@ def split_SW(name, seq1, seq2):
                   -datafile EDNAFULL -gapopen 25 -outfile=%s/align.whatever \
                   -gapextend 1  %s %s %s >./sw.txt 2>&1' \
                   %(water, temp_folder, diagonal, x_limit1, y_limit1))
-#        if name == '94e1d9da-5942-4782-b50b-f4ba42bdbbde':
-#            sys.exit()
         matrix_file = 'SW_PARSE.txt'
-        ##### THERE'S SOMETHING WRONG HERE WHERE SW_PARSE IS EMPTY AFTER THE FIRST READ
-
         diag_set, diag_dict = parse_file(matrix_file, len(seq1), step, \
                                          diag_set, diag_dict)
         os.system('rm SW_PARSE.txt SW_PARSE_PARTIAL.txt sw.txt')
@@ -449,7 +433,6 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
     '''Aligns and returns the consensus'''
     repeats = ''
     corrected_consensus = ''
-#    print(name,peaks,median_distance)
     if median_distance > 500 and len(peaks) > 1:
 
         out_F = temp_folder + '/' + name + '_F.fasta'
@@ -483,15 +466,15 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
                                     + reads[read].replace('-', '') + '\n')
                 out_cons_file.close()
 
-        final=poa_cons
-        for i in np.arange(1,2,1):
+        final = poa_cons
+        for i in np.arange(1, 2, 1):
             try:
-                if i==1:
+                if i == 1:
                     input_cons=poa_cons
-                    output_cons=poa_cons.replace('.fasta','_'+str(i)+'.fasta')
+                    output_cons=poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
                 else:
-                    input_cons=poa_cons.replace('.fasta','_'+str(i-1)+'.fasta')
-                    output_cons=poa_cons.replace('.fasta','_'+str(i)+'.fasta')
+                    input_cons = poa_cons.replace('.fasta', '_' + str(i-1) + '.fasta')
+                    output_cons = poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
 
                 os.system('%s --secondary=no -ax map-ont \
                           %s %s > %s 2> ./minimap2_messages.txt' \
@@ -500,15 +483,13 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
                 os.system('%s --sam --bq 5 -t 1 \
                           %s %s %s %s > ./racon_messages.txt 2>&1' \
                           %(racon,out_Fq, overlap, input_cons, output_cons))
-                final=output_cons
+                final = output_cons
             except:
                 pass
-
-        print(final)    
+        print(final)
         reads = read_fasta(final)
         for read in reads:
             corrected_consensus = reads[read]
-
     return corrected_consensus, repeats
 
 def read_fastq_file(seq_file):
@@ -563,7 +544,6 @@ def analyze_reads(read_list):
             score_list_r = split_SW(name, reverse, reverse)
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(score_list_f, score_list_r, seed)
-            
             if figure:
                 makeFig(score_list_f, score_list_r, peaks, seed, median_distance)
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, \
