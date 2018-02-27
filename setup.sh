@@ -4,7 +4,12 @@ cwd=$(pwd)
 
 # Resolve dependencies
 echo 'Racon'
-git clone https://github.com/isovic/racon.git  && cd racon && make modules && make tools && make -j
+git clone --recursive https://github.com/isovic/racon.git racon
+cd racon
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make
 cd $cwd
 
 echo 'poaV2'
