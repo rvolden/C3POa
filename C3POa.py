@@ -199,7 +199,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
             bar3 = mplpatches.Rectangle((i, 0), 3, scoreList_F[i-seed], lw = 0, \
                                        facecolor = (0, 191/255, 165/255), zorder = 100)
             hist.add_patch(bar3)
-    print(len(scoreList_R), seed)
+
     for j in range(len(scoreList_R), 1, -1):
         if np.in1d(j, peakList_R):
             color = (0.3, 0.3, 0.3)
@@ -354,30 +354,27 @@ def callPeaks(scoreListF, scoreListR, seed):
     smoothedPeaks = []
     for thing in [-x for x in smoothedScoresR[::-1]]:
         smoothedPeaks.append(thing)
-    # smoothedPeaks += [-x for x in smoothedScoresR[::-1]]
     for thing in smoothedScoresF:
         smoothedPeaks.append(thing)
-    # smoothedPeaks += smoothedScoresF
-    sorted_allPeaks_list = sorted(list(set(allPeaks)))
+    sortedPeaks = sorted(list(set(allPeaks)))
 
-    sorted_finalPeaks_list = []
-    for i in range(0, len(sorted_allPeaks_list)):
+    finalPeaks = []
+    for i in range(0, len(sortedPeaks)):
         if i == 0:
-            sorted_finalPeaks_list.append(sorted_allPeaks_list[i])
-        elif sorted_allPeaks_list[i-1] < sorted_allPeaks_list[i] < sorted_allPeaks_list[i-1] + 200:
+            finalPeaks.append(sortedPeaks[i])
+        elif sortedPeaks[i-1] < sortedPeaks[i] < sortedPeaks[i-1] + 200:
             continue
         else:
-            sorted_finalPeaks_list.append(sorted_allPeaks_list[i])
-    # print(sorted_allPeaks_list,sorted_finalPeaks_list)
+            finalPeaks.append(sortedPeaks[i])
     if figure:
-        return sorted_finalPeaks_list, smoothedPeaks
+        return finalPeaks, smoothedPeaks
     # calculates the median distance between detected peaks
     forMedian = []
-    for i in range(len(sorted_finalPeaks_list) - 1):
-        forMedian.append(sorted_finalPeaks_list[i+1] - sorted_finalPeaks_list[i])
+    for i in range(len(finalPeaks) - 1):
+        forMedian.append(finalPeaks[i+1] - finalPeaks[i])
     forMedian = [rounding(x, 50) for x in forMedian]
     medianDistance = np.median(forMedian)
-    return sorted_finalPeaks_list, medianDistance
+    return finalPeaks, medianDistance
 
 def split_SW(name, seq1, seq2):
     '''
