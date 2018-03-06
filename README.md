@@ -33,5 +33,5 @@ pip3 install numpy
 After resolving all of the dependencies, you can run C3POa with python.
 
 ```
-python3 C3POa.py --reads reads.fastq [--path PATH] [--matrix MATRIX] [--config CONFIG] [--output OUTPUT]
+python3 C3POa.py --reads reads.fastq [--path PATH] [--matrix MATRIX] [--config CONFIG] [--output OUTPUT] [--figure FIGURE]
 ```
