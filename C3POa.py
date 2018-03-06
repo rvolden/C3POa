@@ -20,7 +20,7 @@ Dependencies:
     minimap2 2.7-r654
     racon
 
-Add option with parsed subreads, don't do sw, just do poa/racon
+Add option with parsed subreads (fastq), don't do sw, just do poa/racon
 '''
 
 import os
@@ -64,16 +64,18 @@ def configReader(configIn):
             continue
         line = line.rstrip()
         progs.append(line)
+    # sort the programs alphabetically
+    # should be minimap, poa, racon, water
     progs.sort(key = lambda x: x.split('/')[-1])
-    return progs[0], progs[1], progs[2], progs[3],progs[4]
+    return progs[0], progs[1], progs[2], progs[3]
 
 args = argParser()
 if args['config']:
-    consensus, minimap2, poa, racon, water = configReader(args['config'])
+    minimap2, poa, racon, water = configReader(args['config'])
 else:
-    consensus,minimap2, poa, racon, water = 'consensus.py', 'minimap2', 'poa', 'racon', 'water'
+    minimap2, poa, racon, water = 'minimap2', 'poa', 'racon', 'water'
 
-consensus = 'python3 ' + consensus
+consensus = 'python3 consensus.py'
 path = args['path']
 temp_folder = path + '/' + 'tmp1'
 input_file = args['reads']
@@ -169,7 +171,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import matplotlib.patches as mplpatches
-#    plt.style.use('BME163')
+    # plt.style.use('BME163')
     plt.figure(figsize = (10, 5))
     hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
 
@@ -177,11 +179,11 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
     hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), \
               lw = 1, zorder = 550)
     ylim = max(scoreList_F) * 1.1
+    ymin = min(filtered_peaks)*1.1
     xlim = (len(scoreList_F) + seed)
     wholeSeq = mplpatches.Rectangle((0, -15000), xlim, 30000, lw = 0, \
                                     fc = 'grey', zorder = 1000)
     hist.add_patch(wholeSeq)
-
     for i in range(seed, xlim):
         if np.in1d(i, peakList_R):
             color = (0.3, 0.3, 0.3)
@@ -216,7 +218,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
         except IndexError:
             pass
 
-    hist.set_ylim(min(filtered_peaks)*1.1, ylim)
+    hist.set_ylim(ymin, ylim)
     hist.set_xlim(0, xlim)
     hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
     hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
@@ -226,7 +228,7 @@ def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
                      right='off', labelright='off',\
                      top='off', labeltop='off')
 
-    plt.savefig('inverseTest_1' + '.png', dpi = 600)
+    plt.savefig('plumetest.png', dpi = 600)
     plt.close()
     sys.exit()
 
@@ -366,7 +368,7 @@ def callPeaks(scoreListF, scoreListR, seed):
             continue
         else:
             sorted_finalPeaks_list.append(sorted_allPeaks_list[i])
-#    print(sorted_allPeaks_list,sorted_finalPeaks_list)
+    # print(sorted_allPeaks_list,sorted_finalPeaks_list)
     if figure:
         return sorted_finalPeaks_list, smoothedPeaks
     # calculates the median distance between detected peaks
@@ -476,15 +478,15 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
         for i in np.arange(1, 2, 1):
             try:
                 if i == 1:
-                    input_cons=poa_cons
-                    output_cons=poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
+                    input_cons = poa_cons
+                    output_cons = poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
                 else:
                     input_cons = poa_cons.replace('.fasta', '_' + str(i-1) + '.fasta')
                     output_cons = poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
 
                 os.system('%s --secondary=no -ax map-ont \
                           %s %s > %s 2> ./minimap2_messages.txt' \
-                          % (minimap2, input_cons, out_Fq, overlap))
+                          %(minimap2, input_cons, out_Fq, overlap))
 
                 os.system('%s --sam --bq 5 -t 1 \
                           %s %s %s %s > ./racon_messages.txt 2>&1' \
