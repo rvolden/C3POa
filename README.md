@@ -2,8 +2,8 @@
 Computational pipeline for calling consensi on R2C2 nanopore data.
 
 ### Dependencies ###
-- Python 3.6
-- NumPy 1.13.3
+- [Python 3.6](https://www.python.org/downloads/)
+- [NumPy 1.13.3](https://scipy.org/install.html)
 - [poa v1.0.0 Revision: 1.2.2.9](https://github.com/tanghaibao/bio-pipeline)
 - [EMBOSS water: watHerON v8](https://users.soe.ucsc.edu/~rvolden/C3POa/EMBOSS-6.6.0_v8.tar.gz)
 - [minimap2 2.7-r654](https://github.com/lh3/minimap2)
