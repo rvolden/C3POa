@@ -1,8 +1,9 @@
-# Order doesn't really matter
+# Order doesn't matter
 # If you use the config file, you should provide paths to all of the programs
-# at least until I figure out how to handle partial config files.
-/bio-pipeline/poaV2/poa
-/racon/bin/racon
-# /EMBOSS-6.6.0/emboss/water
-/home/rvolden/Documents/Vollmers_Lab/Library_Prep/R2C2_data/score_matrices/pipeline/EMBOSS-6.6.0/emboss/water
-/minimap2/minimap2
+# You need to include all of the example programs
+
+poa	/bio-pipeline/poaV2/poa
+racon	/racon/bin/racon
+water	/EMBOSS-6.6.0/emboss/water
+minimap2	/minimap2/minimap2
+consensus	consensus.py
