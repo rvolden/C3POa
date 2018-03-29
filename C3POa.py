@@ -20,7 +20,7 @@ Dependencies:
     minimap2 2.7-r654
     racon
 
-Add option with parsed subreads (fastq), don't do sw, just do poa/racon
+/home/vollmers/data/R2C2_RAD4_CD27CD38_Run1/splint_reads/0/1D_fixed_splint.fastq
 '''
 
 import os
@@ -56,21 +56,17 @@ def argParser():
                         help='Set to true if you want to output a histogram of scores.')
     return vars(parser.parse_args())
 
-class ConfigError(error):
-
 def configReader(configIn):
     '''Parses the config file.'''
-    from warnings import warn
-
     progs = {}
     for line in open(configIn):
-        if line.startswith('#') or not line:
+        if line.startswith('#') or not line.rstrip().split():
             continue
         line = line.rstrip().split('\t')
         progs[line[0]] = line[1]
     # should have minimap, poa, racon, water, consensus
     # check for extra programs that shouldn't be there
-    possible = set('poa', 'minimap2', 'water', 'consensus', 'racon')
+    possible = set(['poa', 'minimap2', 'water', 'consensus', 'racon'])
     inConfig = set()
     for key in progs.keys():
         inConfig.add(key)
@@ -79,12 +75,13 @@ def configReader(configIn):
     # check for missing programs
     # if missing, default to path
     for missing in possible-inConfig:
-        if missing = 'consensus':
+        if missing == 'consensus':
             path = 'consensus.py'
         else:
             path = missing
         progs[missing] = path
-        warn('Using {0} from your path, not the config file'.format(missing))
+        sys.stderr.write('Using ' + str(missing)
+                         + ' from your path, not the config file.\n')
     return progs
 
 args = argParser()
@@ -99,6 +96,7 @@ else:
     minimap2, poa, racon, water = 'minimap2', 'poa', 'racon', 'water'
     consensus = 'consensus.py'
 
+consensus = 'python3 ' + consensus
 path = args['path']
 temp_folder = path + '/' + 'tmp1'
 input_file = args['reads']
