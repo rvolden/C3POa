@@ -56,26 +56,49 @@ def argParser():
                         help='Set to true if you want to output a histogram of scores.')
     return vars(parser.parse_args())
 
+class ConfigError(error):
+
 def configReader(configIn):
     '''Parses the config file.'''
-    progs = []
+    from warnings import warn
+
+    progs = {}
     for line in open(configIn):
-        if line.startswith('#'):
+        if line.startswith('#') or not line:
             continue
-        line = line.rstrip()
-        progs.append(line)
-    # sort the programs alphabetically
-    # should be minimap, poa, racon, water
-    progs.sort(key = lambda x: x.split('/')[-1])
-    return progs[0], progs[1], progs[2], progs[3]
+        line = line.rstrip().split('\t')
+        progs[line[0]] = line[1]
+    # should have minimap, poa, racon, water, consensus
+    # check for extra programs that shouldn't be there
+    possible = set('poa', 'minimap2', 'water', 'consensus', 'racon')
+    inConfig = set()
+    for key in progs.keys():
+        inConfig.add(key)
+        if key not in possible:
+            raise Exception('Check config file')
+    # check for missing programs
+    # if missing, default to path
+    for missing in possible-inConfig:
+        if missing = 'consensus':
+            path = 'consensus.py'
+        else:
+            path = missing
+        progs[missing] = path
+        warn('Using {0} from your path, not the config file'.format(missing))
+    return progs
 
 args = argParser()
 if args['config']:
-    minimap2, poa, racon, water = configReader(args['config'])
+    progs = configReader(args['config'])
+    minimap2 = progs['minimap2']
+    poa = progs['poa']
+    racon = progs['racon']
+    water = progs['water']
+    consensus = progs['consensus']
 else:
     minimap2, poa, racon, water = 'minimap2', 'poa', 'racon', 'water'
+    consensus = 'consensus.py'
 
-consensus = 'python3 consensus.py'
 path = args['path']
 temp_folder = path + '/' + 'tmp1'
 input_file = args['reads']
