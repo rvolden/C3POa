@@ -8,7 +8,7 @@ Computational pipeline for calling consensi on R2C2 nanopore data.
 - [EMBOSS water: watHerON v8](https://users.soe.ucsc.edu/~rvolden/C3POa/EMBOSS-6.6.0_v8.tar.gz)
 - [minimap2 2.7-r654](https://github.com/lh3/minimap2)
 - [racon](https://github.com/isovic/racon)
-- [blat source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip)/[blat executable](http://hgdownload.soe.ucsc.edu/admin/exe/)
+- [blat source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or [blat executable](http://hgdownload.soe.ucsc.edu/admin/exe/)
 
 To install dependencies, use setup.sh.  
 setup.sh will download and make all of the packages that you need to run C3POa (except Python, NumPy and blat).  

@@ -12,6 +12,10 @@ parser.add_argument('-o', '--output_path', type=str)
 parser.add_argument('-q', '--quality_cutoff', type=str)
 parser.add_argument('-l', '--read_length_cutoff', type=str)
 parser.add_argument('-s', '--splint_file', type=str)
+parser.add_argument('-c', '--config', type=str, action='store', default='',
+                    help='If you want to use a config file to specify paths to\
+                          programs, specify them here. Use for poa, racon, water,\
+                          blat, and minimap2 if they are not in your path.')
 
 args = parser.parse_args()
 output_path = args.output_path + '/'
@@ -20,7 +24,39 @@ quality_cutoff = float(args.quality_cutoff)
 read_length_cutoff = float(args.read_length_cutoff)
 splint_file = args.splint_file
 
-blat = 'blat'
+def configReader(configIn):
+    '''Parses the config file.'''
+    progs = {}
+    for line in open(configIn):
+        if line.startswith('#') or not line.rstrip().split():
+            continue
+        line = line.rstrip().split('\t')
+        progs[line[0]] = line[1]
+    # should have minimap, poa, racon, water, consensus
+    # check for extra programs that shouldn't be there
+    possible = set(['poa', 'minimap2', 'water', 'consensus', 'racon', 'blat'])
+    inConfig = set()
+    for key in progs.keys():
+        inConfig.add(key)
+        if key not in possible:
+            raise Exception('Check config file')
+    # check for missing programs
+    # if missing, default to path
+    for missing in possible-inConfig:
+        if missing == 'consensus':
+            path = 'consensus.py'
+        else:
+            path = missing
+        progs[missing] = path
+        sys.stderr.write('Using ' + str(missing)
+                         + ' from your path, not the config file.\n')
+    return progs
+
+if args['config'] or args['c']:
+    progs = configReader(args['config'])
+    blat = progs['blat']
+else:
+    blat = 'blat'
 
 def read_and_filter_fastq(input_file):
     length = 0
