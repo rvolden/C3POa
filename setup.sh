@@ -30,3 +30,4 @@ cd EMBOSS-6.6.0
 ./configure --prefix=/usr/local/emboss
 make
 cd $cwd
+echo 'Done'
