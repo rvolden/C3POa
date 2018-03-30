@@ -11,3 +11,4 @@ water	/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water
 #consensus	consensus.py
 racon	/home/vollmers/scripts/racon/bin/racon
 consensus	/home/rvolden/C3POa/consensus.py
+blat	blat
