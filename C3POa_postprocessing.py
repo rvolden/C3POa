@@ -7,17 +7,58 @@ import os
 import argparse
 import numpy as np
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-i', '--input_fasta_file', type=str)
-parser.add_argument('-o', '--output_path', type=str)
-parser.add_argument('-a', '--adapter_file', type=str)
+def argParser():
+    '''Parses arguments.'''
+    parser = argparse.ArgumentParser(description = '',
+                                     add_help = True,
+                                     prefix_chars = '-')
+    parser.add_argument('--input_fasta_file', '-i', type=str)
+    parser.add_argument('--output_path', '-o', type=str)
+    parser.add_argument('--adapter_file', '-a', type=str)
+    parser.add_argument('--config', '-c', type=str, action='store', default='',
+                        help='If you want to use a config file to specify paths to\
+                              programs, specify them here. Use for poa, racon, water,\
+                              blat, and minimap2 if they are not in your path.')
+    return vars(parser.parse_args())
 
-args = parser.parse_args()
-output_path = args.output_path + '/'
-input_file = args.input_fasta_file
-adapter_file = args.adapter_file
+args = argParser()
+output_path = args['output_path'] + '/'
+input_file = args['input_fasta_file']
+adapter_file = args['adapter_file']
 
-blat = 'blat'
+def configReader(configIn):
+    '''Parses the config file.'''
+    progs = {}
+    for line in open(configIn):
+        if line.startswith('#') or not line.rstrip().split():
+            continue
+        line = line.rstrip().split('\t')
+        progs[line[0]] = line[1]
+    # should have minimap, poa, racon, water, consensus
+    # check for extra programs that shouldn't be there
+    possible = set(['poa', 'minimap2', 'water', 'consensus', 'racon', 'blat'])
+    inConfig = set()
+    for key in progs.keys():
+        inConfig.add(key)
+        if key not in possible:
+            raise Exception('Check config file')
+    # check for missing programs
+    # if missing, default to path
+    for missing in possible-inConfig:
+        if missing == 'consensus':
+            path = 'consensus.py'
+        else:
+            path = missing
+        progs[missing] = path
+        sys.stderr.write('Using ' + str(missing)
+                         + ' from your path, not the config file.\n')
+    return progs
+
+if args['config'] or args['c']:
+    progs = configReader(args['config'])
+    blat = progs['blat']
+else:
+    blat = 'blat'
 
 def read_fasta(inFile):
     '''Reads in FASTA files, returns a dict of header:sequence'''
