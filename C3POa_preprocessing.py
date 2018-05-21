@@ -127,7 +127,7 @@ def parse_blat(path):
         a = line.strip().split('\t')
         read_name, adapter, strand = a[9], a[13], a[8]
         gaps, score = float(a[5]), float(a[0])
-        sequence_length = float(a[10])
+        sequence_length = int(a[10])
         if gaps < 50 and score > 50:   # Looks for unspliced quality alignment
           if strand == '+':
                 start = int(a[11]) - int(a[15])
