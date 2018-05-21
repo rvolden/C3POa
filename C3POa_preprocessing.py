@@ -25,11 +25,11 @@ def argParser():
 
 # args = parser.parse_args()
 args = argParser()
-output_path = args[output_path] + '/'
-input_file = args[input_fastq_file]
-quality_cutoff = args[quality_cutoff] # might need to type cast float, but shouldn't at this point
-read_length_cutoff = args[read_length_cutoff]
-splint_file = args[splint_file]
+output_path = args['output_path'] + '/'
+input_file = args['input_fastq_file']
+quality_cutoff = args['quality_cutoff'] # might need to type cast float, but shouldn't at this point
+read_length_cutoff = args['read_length_cutoff']
+splint_file = args['splint_file']
 
 def configReader(configIn):
     '''Parses the config file.'''
