@@ -6,23 +6,30 @@ import os
 import argparse
 import numpy as np
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-i', '--input_fastq_file', type=str)
-parser.add_argument('-o', '--output_path', type=str)
-parser.add_argument('-q', '--quality_cutoff', type=str)
-parser.add_argument('-l', '--read_length_cutoff', type=str)
-parser.add_argument('-s', '--splint_file', type=str)
-parser.add_argument('-c', '--config', type=str, action='store', default='',
-                    help='If you want to use a config file to specify paths to\
-                          programs, specify them here. Use for poa, racon, water,\
-                          blat, and minimap2 if they are not in your path.')
+def argParser():
+    '''Parses arguments.'''
+    parser = argparse.ArgumentParser(description = 'Prepare sequences for\
+                                                    C3POa analysis.',
+                                     add_help = True,
+                                     prefix_chars = '-')
+    parser.add_argument('--input_fastq_file', '-i', type=str, action='store')
+    parser.add_argument('--output_path', '-o', type=str, action='store')
+    parser.add_argument('--quality_cutoff', '-q', type=float, action='store')
+    parser.add_argument('--read_length_cutoff', '-l', type=float, action='store')
+    parser.add_argument('--splint_file', '-s', type=str, action='store')
+    parser.add_argument('--config', '-c', type=str, action='store', default='',
+                        help='If you want to use a config file to specify paths to\
+                              programs, specify them here. Use for poa, racon, water,\
+                              blat, and minimap2 if they are not in your path.')
+    return vars(parser.parse_args())
 
-args = parser.parse_args()
-output_path = args.output_path + '/'
-input_file = args.input_fastq_file
-quality_cutoff = float(args.quality_cutoff)
-read_length_cutoff = float(args.read_length_cutoff)
-splint_file = args.splint_file
+# args = parser.parse_args()
+args = argParser()
+output_path = args[output_path] + '/'
+input_file = args[input_fastq_file]
+quality_cutoff = args[quality_cutoff] # might need to type cast float, but shouldn't at this point
+read_length_cutoff = args[read_length_cutoff]
+splint_file = args[splint_file]
 
 def configReader(configIn):
     '''Parses the config file.'''
