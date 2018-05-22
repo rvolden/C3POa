@@ -93,13 +93,8 @@ def run_blat(path, infile, adapter_fasta):
               %s %s %s/Adapter_to_consensus_alignment.psl' \
               %(blat,adapter_fasta,infile,path))
 
-def parse_blat(path, infile):
-    adapter_dict = {}
-    length = 0
-    for line in open(infile):
-        length += 1
-
-    iterator = 0
+def parse_blat(path, infile, length):
+    adapter_dict, iterator = {}, 0
     infile1 = open(infile, 'r')
     while iterator < length:
         line = infile1.readline()
@@ -118,10 +113,10 @@ def parse_blat(path, infile):
         if int(a[5]) < 50 and float(a[0]) > 10:
             if strand == '+':
                   start = int(a[11]) - int(a[15])
-                  end = int(a[12]) + int(a[14]) - int(a[16])
+                  end = int(a[12]) + (int(a[14]) - int(a[16]))
                   position = end
             if strand == '-':
-                  start = int(a[11]) - int(a[14]) - int(a[16])
+                  start = int(a[11]) - (int(a[14]) - int(a[16]))
                   end = int(a[12]) + int(a[15])
                   position = start
             adapter_dict[read_name][strand].append((adapter,
@@ -130,42 +125,43 @@ def parse_blat(path, infile):
     return adapter_dict
 
 def write_fasta_file(path, adapter_dict, reads):
-    out = open(path + 'R2C2_full_length_consensus_reads.fasta', 'w')
+    out = open(path + 'R2C2_full_length_consensus_reads_R2.fasta', 'w')
 
     for name, sequence in reads.items():
-      qual = float(name.split('_')[1])
-      if qual >= 9:
-        adapter_plus = sorted(adapter_dict[name]['+'],
-                              key=lambda x: x[2], reverse=False)
-        adapter_minus = sorted(adapter_dict[name]['-'],
-                               key=lambda x: x[2], reverse=False)
-        plus_list_name, plus_list_position = [], []
-        minus_list_name, minus_list_position = [], []
-        for adapter in adapter_plus:
-            if adapter[0] != '-':
-                plus_list_name.append(adapter[0])
-                plus_list_position.append(adapter[2])
-        for adapter in adapter_minus:
-            if adapter[0] != '-':
-                minus_list_name.append(adapter[0])
-                minus_list_position.append(adapter[2])
+        qual = float(name.split('_')[1])
+        if qual >= 9:
+            adapter_plus = sorted(adapter_dict[name]['+'],
+                                  key=lambda x: x[2], reverse=False)
+            adapter_minus = sorted(adapter_dict[name]['-'],
+                                  key=lambda x: x[2], reverse=False)
+            plus_list_name, plus_list_position = [], []
+            minus_list_name, minus_list_position = [], []
+            for adapter in adapter_plus:
+                if adapter[0] != '-':
+                    plus_list_name.append(adapter[0])
+                    plus_list_position.append(adapter[2])
+            for adapter in adapter_minus:
+                if adapter[0] != '-':
+                    minus_list_name.append(adapter[0])
+                    minus_list_position.append(adapter[2])
 
-        if len(plus_list_name) == 1 and len(minus_list_name) == 1:
-            if plus_list_position[0] < minus_list_position[0]:
-                seq = sequence[plus_list_position[0]:minus_list_position[0]]
-                ada = sequence[plus_list_position[0]-40:minus_list_position[0]+40]
-                name += '_' + str(len(seq))
-                if '5Prime_adapter' in plus_list_name[0] \
-                   and '3Prime_adapter' in minus_list_name[0]:
-                    out.write('>%s\n%s\n' %(name, ada))
-                elif '3Prime_adapter' in plus_list_name[0] \
-                     and '5Prime_adapter' in minus_list_name[0]:
-                    out.write('>%s\n%s\n' %(name, reverse_complement(ada)))
+            if len(plus_list_name) == 1 and len(minus_list_name) == 1:
+                if plus_list_position[0] < minus_list_position[0]:
+                    seq = sequence[plus_list_position[0]:minus_list_position[0]]
+                    ada = sequence[plus_list_position[0]-40:minus_list_position[0]+40]
+                    name += '_' + str(len(seq))
+                    if '5Prime_adapter' in plus_list_name[0] \
+                       and '3Prime_adapter' in minus_list_name[0]:
+                        out.write('>%s\n%s\n' %(name, ada))
+                    elif '3Prime_adapter' in plus_list_name[0] \
+                         and '5Prime_adapter' in minus_list_name[0]:
+                        out.write('>%s\n%s\n' %(name, reverse_complement(ada)))
 
 def main():
     reads = read_fasta(input_file)
-    run_blat(output_path, input_file, adapter_file)
-    adapter_dict = parse_blat(output_path, input_file)
+    fileLen = len(reads)*2
+    # run_blat(output_path, input_file, adapter_file)
+    adapter_dict = parse_blat(output_path, input_file, fileLen)
     write_fasta_file(output_path, adapter_dict, reads)
 
 if __name__ == '__main__':
