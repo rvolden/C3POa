@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 29 Mar 2018
+# Last updated: 22 May 2018
 
 import sys
 import os
@@ -161,7 +161,6 @@ def write_fasta_file(path, adapter_dict, reads):
                 elif '3Prime_adapter' in plus_list_name[0] \
                      and '5Prime_adapter' in minus_list_name[0]:
                     out.write('>%s\n%s\n' %(name, reverse_complement(ada)))
-
 
 def main():
     reads = read_fasta(input_file)

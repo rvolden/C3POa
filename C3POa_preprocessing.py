@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 29 Mar 2018
+# Last updated: 22 May 2018
 
 import os
 import argparse
@@ -128,15 +128,15 @@ def parse_blat(path):
         read_name, adapter, strand = a[9], a[13], a[8]
         gaps, score = float(a[5]), float(a[0])
         sequence_length = int(a[10])
-        if gaps < 50 and score > 50:   # Looks for unspliced quality alignment
-            if strand == '+':
+        if gaps < 50 and score > 50: # Looks for unspliced quality alignment
+          if strand == '+':
                 start = int(a[11]) - int(a[15])
                 end = int(a[12]) + int(a[14]) - int(a[16])
-            if strand == '-':
+          if strand == '-':
                 start = int(a[11]) - int(a[14]) - int(a[16])
                 end = int(a[12]) + int(a[15])
-            position = int(min(max(0, start+((end-start)/2)), sequence_length-1))
-            adapter_dict[read_name][strand].append((adapter, float(a[0]), position))
+          position = min(max(0, int(start+((end-start)/2))), sequence_length-1)
+          adapter_dict[read_name][strand].append((adapter, float(a[0]), position))
     return adapter_dict
 
 def write_fastq_files(path, adapter_dict, reads):
