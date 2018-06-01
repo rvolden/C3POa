@@ -160,7 +160,7 @@ def write_fasta_file(path, adapter_dict, reads):
 def main():
     reads = read_fasta(input_file)
     fileLen = len(reads)*2
-    # run_blat(output_path, input_file, adapter_file)
+    run_blat(output_path, input_file, adapter_file)
     adapter_dict = parse_blat(output_path, input_file, fileLen)
     write_fasta_file(output_path, adapter_dict, reads)
 
