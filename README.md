@@ -1,6 +1,19 @@
 # C3POa
 Computational pipeline for calling consensi on R2C2 nanopore data.
 
+# C3POa_preprocessing.py # 
+
+Takes raw 1D nanopore R2C2 reads in fastq format, removes low quality and short reads and then finds splint sequences in those reads using BLAT. It then adds the position of the splint to the read name and generates separate folders each containing a fastq file containing 4000 raw reads.  
+
+# C3POa.py #
+
+Takes fastq output by C3POa_preprocessing and generates consensus sequences in fasta format and a subread sequences in fastq format.
+
+# C3POa_postprocessing.py #
+
+Trimms and reorients consensus sequences.
+
+
 ### Dependencies ###
 - [Python 3.6](https://www.python.org/downloads/)
 - [NumPy 1.13.3](https://scipy.org/install.html)
