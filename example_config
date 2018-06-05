@@ -3,12 +3,11 @@
 # You need to include all of the example programs
 # Use tabs to separate the program name from the path
 
-#poa	/bio-pipeline/poaV2/poa
-#racon	/racon/bin/racon
-#water	/EMBOSS-6.6.0/emboss/water
-water	/home/vollmers/scripts/EMBOSS-6.6.0/emboss/water
-#minimap2	/minimap2/minimap2
-#consensus	consensus.py
-racon	/home/vollmers/scripts/racon/bin/racon
-consensus	/home/rvolden/C3POa/consensus.py
+poa	/bio-pipeline/poaV2/poa
+racon	/racon/bin/racon
+water	/EMBOSS-6.6.0/emboss/water
+minimap2	/minimap2/minimap2
+consensus	consensus.py
+racon	/racon/bin/racon
+consensus	consensus.py
 blat	blat
