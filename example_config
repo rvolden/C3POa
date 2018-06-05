@@ -9,5 +9,4 @@ water	/EMBOSS-6.6.0/emboss/water
 minimap2	/minimap2/minimap2
 consensus	consensus.py
 racon	/racon/bin/racon
-consensus	consensus.py
 blat	blat
