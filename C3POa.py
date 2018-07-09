@@ -506,8 +506,8 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
                           %s %s > %s 2> ./minimap2_messages.txt' \
                           %(minimap2, input_cons, out_Fq, overlap))
 
-                os.system('%s --sam --bq 5 -t 1 \
-                          %s %s %s %s > ./racon_messages.txt 2>&1' \
+                os.system('%s -q 5 -t 1 \
+                          %s %s %s >%s 2>./racon_messages.txt' \
                           %(racon,out_Fq, overlap, input_cons, output_cons))
                 final = output_cons
             except:
