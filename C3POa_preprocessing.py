@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 22 May 2018
+# Last updated: 5 June 2018
 
 import os
 import sys
@@ -24,7 +24,6 @@ def argParser():
                               blat, and minimap2 if they are not in your path.')
     return vars(parser.parse_args())
 
-# args = parser.parse_args()
 args = argParser()
 output_path = args['output_path'] + '/'
 input_file = args['input_fastq_file']
@@ -92,7 +91,6 @@ def read_and_filter_fastq(input_file):
     return(read_dict)
 
 def run_blat(path, reads):
-
     fasta_file = path + '/R2C2_temp_for_BLAT.fasta'
     input_file_fasta = open(fasta_file, 'w')
 
