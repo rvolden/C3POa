@@ -144,9 +144,9 @@ def write_fastq_files(path, adapter_dict, reads):
     for read in reads:
         name, sequence, quality = read, reads[read][0], reads[read][1]
         adapter_plus = sorted(adapter_dict[name]['+'],
-                              key=lambda x: x[2], reverse=False)
+                              key=lambda x: x[1], reverse=True)
         adapter_minus=sorted(adapter_dict[name]['-'],
-                             key=lambda x: x[2], reverse=False)
+                             key=lambda x: x[1], reverse=True)
         plus_list_name, plus_list_position = [], []
         minus_list_name, minus_list_position = [], []
 
@@ -159,7 +159,7 @@ def write_fastq_files(path, adapter_dict, reads):
                 minus_list_name.append(adapter[0])
                 minus_list_position.append(adapter[2])
 
-        if 'Splint' in plus_list_name or 'Splint' in minus_list_name:
+        if len(plus_list_name) > 0 or len(minus_list_name) > 0:
             success += 1
             try:
                 out_fastq = open(path + '/splint_reads/'
