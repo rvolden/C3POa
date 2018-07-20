@@ -19,8 +19,6 @@ Dependencies:
     EMBOSS water: watHerON v8
     minimap2 2.7-r654
     racon
-
-/home/vollmers/data/R2C2_RAD4_CD27CD38_Run1/splint_reads/0/1D_fixed_splint.fastq
 '''
 
 import os
