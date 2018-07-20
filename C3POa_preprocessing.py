@@ -132,7 +132,7 @@ def parse_blat(path):
                 start = int(a[11]) - int(a[15])
                 end = int(a[12]) + int(a[14]) - int(a[16])
           if strand == '-':
-                start = int(a[11]) - int(a[14]) - int(a[16])
+                start = int(a[11]) - (int(a[14]) - int(a[16]))
                 end = int(a[12]) + int(a[15])
           position = min(max(0, int(start+((end-start)/2))), sequence_length-1)
           adapter_dict[read_name][strand].append((adapter, float(a[0]), position))
