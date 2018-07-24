@@ -172,11 +172,11 @@ def write_fastq_files(path, adapter_dict, reads):
                                  + str(int(success/4000))
                                  + '/R2C2_raw_reads' + '.fastq', 'w')
             if len(plus_list_name) > 0:
-                out_fastq.write('>' + name + '_'
+                out_fastq.write('@' + name + '_'
                                 + str(plus_list_position[0]) + '\n'
                                 + sequence + '\n+\n' + quality + '\n')
             else:
-                out_fastq.write('>' + name + '_'
+                out_fastq.write('@' + name + '_'
                                 + str(minus_list_position[0])
                                 + '\n' + sequence + '\n+\n' + quality + '\n')
 
