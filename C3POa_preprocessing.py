@@ -27,7 +27,7 @@ def argParser():
 args = argParser()
 output_path = args['output_path'] + '/'
 input_file = args['input_fastq_file']
-quality_cutoff = args['quality_cutoff'] # might need to type cast float, but shouldn't at this point
+quality_cutoff = args['quality_cutoff']
 read_length_cutoff = args['read_length_cutoff']
 splint_file = args['splint_file']
 
@@ -179,6 +179,16 @@ def write_fastq_files(path, adapter_dict, reads):
                 out_fastq.write('>' + name + '_'
                                 + str(minus_list_position[0])
                                 + '\n' + sequence + '\n+\n' + quality + '\n')
+        else:
+            try:
+                out_fastq = open(path + '/splint_reads/'
+                                 + '/No_splint_reads' + '.fastq', 'a')
+            except:
+                out_fastq = open(path + '/splint_reads/'
+                                 + '/No_splint_reads' + '.fastq', 'w')
+            out_fastq.write('>' + name
+                                + '\n' + sequence + '\n+\n' + quality + '\n')
+
 
 def main():
     print('Reading and filtering fastq file')
