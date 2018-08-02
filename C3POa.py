@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 21 Feb 2018
+# Last updated: 2 Aug 2018
 
 '''
 Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
 
 Analyses reads by reading them in, doing self-self alignments, calling
-peaks in alignment scores, splitting reads, aligning those to each other,
+peaks in alignment scores,  splitting reads, aligning those to each other,
 and giving back a consensus sequence.
 
 Usage:
@@ -19,6 +19,16 @@ Dependencies:
     EMBOSS water: watHerON v8
     minimap2 2.7-r654
     racon
+
+02/08/2018 Release note:
+    By default, this will now output what we call zero repeat reads along
+    with the rest of the R2C2 reads. Zero repeat reads are reads that contain
+    a splint with incomplete portions of your original molecule on each side.
+    If there's an overlap, it'll align the portions that overlap and
+    concatenate the rest of the read together to try and make a contiguous
+    read. These reads are very similar to normal 1D reads, but there are a few
+    cases where there is a slight improvement. There will be an option to
+    remove these reads in postprocessing.
 '''
 
 import os
@@ -395,37 +405,95 @@ def callPeaks(scoreListF, scoreListR, seed):
     medianDistance = np.median(forMedian)
     return finalPeaks, medianDistance
 
-def split_SW(name, seq1, seq2):
+def water_parser():
     '''
-    I think there's some redundancy here that I can change or make more efficient
+    Parses the water output and returns the indeces where the read starts
+    repeating on itself. Used for determining where to start the partial
+    consensus reads because peaks are not base accurate.
+    Also writes the sequences themselves to a file because I need the gaps
+    to use consensus.py to make a better partial consensus.
     '''
-    diag_dict, diag_set = {}, set()
-    for step in range(0, len(seq1), 1000):
-        seq3 = seq1[step:min(len(seq1), step + 1000)]
-        seq4 = seq2[:1000]
+    alignFile, lineNum = temp_folder + '/align.whatever', 0
+    posFirstSeq, posSecondSeq = [], []
+    # temporary lists to build the sequences with gaps
+    tempFirst, tempSecond = [], []
+    for line in open(alignFile):
+        line = line.strip()
+        if not line or line.startswith('#') or '|' in line:
+            continue
+        seq = line.split()[2]
+        if lineNum % 2 == 0:
+            tempFirst.append(seq)
+            posFirstSeq.append(int(line.split()[1]))
+            posFirstSeq.append(int(line.split()[3]))
+        else:
+            tempSecond.append(seq)
+            posSecondSeq.append(int(line.split()[1]))
+            posSecondSeq.append(int(line.split()[3]))
+        lineNum += 1
+    partialConsensus = open(temp_folder + '/partial.fasta', 'w+')
+    partialConsensus.write('>First' + '\n' + ''.join(tempFirst) + '\n')
+    partialConsensus.write('>Second' + '\n' + ''.join(tempSecond))
+    partialConsensus.close()
+    firstSeqIndeces = (posFirstSeq[0] - 1, posFirstSeq[-1] - 1)
+    secondSeqIndeces = (posSecondSeq[0] - 1, posSecondSeq[-1] - 1)
 
-        align_file1 = open('seq3.fasta', 'w')
-        align_file1.write('>' + name + '\n' + seq3 + '\n')
+    return firstSeqIndeces, secondSeqIndeces
+
+def run_water(step, seq1, seq2, totalLen, diag_dict, diag_set):
+    '''
+    Runs water using the parameters given by split_SW
+    '''
+    diagonal = 'no'
+    if step == 0:
+        diagonal = 'yes'
+
+    x_limit, y_limit = len(seq1), len(seq2)
+
+    os.system('%s -asequence seq1.fasta -bsequence seq2.fasta \
+              -datafile EDNAFULL -gapopen 25 -outfile=%s/align.whatever \
+              -gapextend 1  %s %s %s >./sw.txt 2>&1' \
+              %(water, temp_folder, diagonal, x_limit, y_limit))
+    matrix_file = 'SW_PARSE.txt'
+    diag_set, diag_dict = parse_file(matrix_file, totalLen, step, \
+                                     diag_set, diag_dict)
+    os.system('rm SW_PARSE.txt SW_PARSE_PARTIAL.txt sw.txt')
+    return diag_set, diag_dict
+
+def split_SW(name, seq, step):
+    '''
+    Takes a sequence and does the water alignment to itself
+    Returns a list of scores from summing diagonals from the
+    alignment matrix.
+    name (str): the sequence header
+    seq (str): nucleotide sequence
+    step (bool): if false, aligns entire sequence to itself
+    '''
+    totalLen = len(seq)
+    diag_dict, diag_set = {}, set()
+    if step:
+        for step in range(0, len(seq), 1000):
+            seq1 = seq[step:min(len(seq), step + 1000)]
+            seq2 = seq[:1000]
+            align_file1 = open('seq1.fasta', 'w')
+            align_file1.write('>' + name + '\n' + seq1 + '\n')
+            align_file1.close()
+            align_file2 = open('seq2.fasta', 'w')
+            align_file2.write('>' + name + '\n' + seq2 + '\n')
+            align_file2.close()
+
+            run_water(step, seq1, seq2, totalLen, diag_dict, diag_set)
+    else:
+        step = 0
+        align_file1 = open('seq1.fasta', 'w')
+        align_file1.write('>' + name + '\n' + seq + '\n')
         align_file1.close()
-        align_file2 = open('seq4.fasta', 'w')
-        align_file2.write('>' + name + '\n' + seq4 + '\n')
+        align_file2 = open('seq2.fasta', 'w')
+        align_file2.write('>' + name + '\n' + seq + '\n')
         align_file2.close()
 
-        diagonal = 'no'
-        if step == 0:
-            diagonal = 'yes'
+        run_water(step, seq, seq, totalLen, diag_dict, diag_set)
 
-        x_limit1 = len(seq3)
-        y_limit1 = len(seq4)
-
-        os.system('%s -asequence seq3.fasta -bsequence seq4.fasta \
-                  -datafile EDNAFULL -gapopen 25 -outfile=%s/align.whatever \
-                  -gapextend 1  %s %s %s >./sw.txt 2>&1' \
-                  %(water, temp_folder, diagonal, x_limit1, y_limit1))
-        matrix_file = 'SW_PARSE.txt'
-        diag_set, diag_dict = parse_file(matrix_file, len(seq1), step, \
-                                         diag_set, diag_dict)
-        os.system('rm SW_PARSE.txt SW_PARSE_PARTIAL.txt sw.txt')
     diag_set = sorted(list(diag_set))
     plot_list = []
     for diag in diag_set:
@@ -453,12 +521,20 @@ def parse_file(matrix_file, seq_length, step, diag_set, diag_dict):
             diag_dict[position] = value
     return diag_set, diag_dict
 
-def determine_consensus(name, seq, peaks, qual, median_distance):
-    '''Aligns and returns the consensus'''
+def determine_consensus(name, seq, peaks, qual, median_distance, seed):
+    '''
+    Aligns and returns the consensus depending on the number of repeats
+    If there are multiple peaks, it'll do the normal partial order
+    alignment with racon correction
+    If there are two repeats, it'll do the special pairwise consensus
+    making
+    Otherwise, it'll try to make a 0 repeat consensus: reads with a splint
+    in the middle where you can try to salvage the flanking sequences to
+    try and make a complete read
+    '''
     repeats = ''
     corrected_consensus = ''
     if median_distance > 500 and len(peaks) > 1:
-
         out_F = temp_folder + '/' + name + '_F.fasta'
         out_Fq = temp_folder + '/' + name + '_F.fastq'
         poa_cons = temp_folder + '/' + name + '_consensus.fasta'
@@ -514,7 +590,78 @@ def determine_consensus(name, seq, peaks, qual, median_distance):
         reads = read_fasta(final)
         for read in reads:
             corrected_consensus = reads[read]
+
+    # reads that have the potential for a partial consensus
+    elif len(peaks) == 1:
+        # before/after positions are the alignment start/end positions for
+        # both portions of the sequence
+        beforeIndeces, afterIndeces = water_parser()
+        endPortion = seq[beforeIndeces[1]:seed]
+        begPortion = seq[seed:afterIndeces[0]]
+
+        # make a temporary FASTQ file for consensus.py with portions
+        # of reads that match itself
+        tempFastqName = temp_folder + '/' + name + 'consensusFastq.fastq'
+        tempFastq = open(tempFastqName, 'w+')
+        tempFastq.write('@' + name + '\n'
+                        + seq[beforeIndeces[0]:beforeIndeces[1] + 1] + '\n+\n'
+                        + qual[beforeIndeces[0]:beforeIndeces[1] + 1] + '\n'
+                        + '@' + name + '\n'
+                        + seq[afterIndeces[0]:afterIndeces[1] + 1] + '\n+\n'
+                        + qual[afterIndeces[0]:afterIndeces[1] + 1])
+        tempFastq.close()
+        alignedFasta = temp_folder + '/partial.fasta'
+        fromConsensus = temp_folder + '/' + name + '_fromConsensus.fasta'
+        os.system('%s %s %s > %s'
+                  %(consensus, alignedFasta, tempFastqName, fromConsensus))
+        toGetConsensus = read_fasta(fromConsensus)
+        seqFromCons = toGetConsensus['consensus']
+        # put all the pieces back together to make the consensus
+        corrected_consensus = begPortion + seqFromCons + endPortion
+        repeats = '0'
+
     return corrected_consensus, repeats
+
+def makeFigPartial(scoreList, peakList, seed, filtered_peaks):
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mplpatches
+    plt.figure(figsize = (10, 5))
+    hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
+
+    xlist = [x for x in range(0, len(filtered_peaks))]
+    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), \
+              lw = 1, zorder = 5000)
+
+    ylim = max(scoreList) * 1.1
+    ymin = 0
+    xlim = len(scoreList)
+
+    for i in range(xlim):
+        if np.in1d(i, peakList):
+            color = (0.3, 0.3, 0.3)
+            peakMark = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim, \
+                                            lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
+            hist.add_patch(peakMark) # 253/255, 177/255, 85/255
+        else:
+            scoreVal = mplpatches.Rectangle((i, 0), 3, scoreList[i], lw = 0, \
+                                            facecolor = (0, 191/255, 165/255), zorder = 100)
+            hist.add_patch(scoreVal)
+
+    hist.set_ylim(ymin, ylim)
+    hist.set_xlim(0, xlim)
+    hist.set_xticks(range(0, xlim, 50))
+    hist.set_xticklabels(range(0, xlim, 50), fontsize=4, rotation=90)
+    hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
+    hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
+    hist.tick_params(axis='both',which='both',\
+                     bottom='on', labelbottom='on',\
+                     left='on', labelleft='on',\
+                     right='off', labelright='off',\
+                     top='off', labeltop='off')
+    plt.savefig('peakTest.png', dpi = 600)
+    plt.close()
+    sys.exit()
 
 def read_fastq_file(seq_file):
     '''
@@ -563,16 +710,29 @@ def analyze_reads(read_list):
             final_consensus = ''
             # score lists are made for sequence before and after the seed
             forward = seq[seed:]
-            score_list_f = split_SW(name, forward, forward)
+            score_list_f = split_SW(name, forward, step=True)
             reverse = revComp(seq[:seed])
-            score_list_r = split_SW(name, reverse, reverse)
+            score_list_r = split_SW(name, reverse, step=True)
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(score_list_f, score_list_r, seed)
-            if figure:
+
+            if len(peaks) == 1:
+                scoreList = split_SW(name, seq, step=False)
+                slr = []
+                peaks, median_distance = callPeaks(scoreList, slr, seed)
+                if len(peaks) == 2:
+                    peaks.remove(seed)
+                else:
+                    continue
+
+            if figure and len(peaks) > 1:
                 makeFig(score_list_f, score_list_r, peaks, seed, median_distance)
+            if figure and len(peaks) == 1:
+                makeFigPartial(scoreList, peaks, seed, median_distance)
+
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, \
-                                                            qual, median_distance)
-            # output the consensus sequence
+                                                            qual, median_distance, \
+                                                            seed)
             if final_consensus:
                 final_out = open(out_file, 'a')
                 final_out.write('>' + name + '_' \
