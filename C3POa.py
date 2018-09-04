@@ -56,6 +56,12 @@ def argParser():
                         help='If you want to use a config file to specify paths to\
                               programs, specify them here. Use for poa, racon, water,\
                               blat, and minimap2 if they are not in your path.')
+    parser.add_argument('--slencutoff', '-s', type=int, action='store', default=1000,
+                        help='Sets the length cutoff for your raw sequences. Anything\
+                              shorter than the cutoff will be excluded.')
+    parser.add_argument('--mdistcutoff', '-d', type=int, action='store', default=500,
+                        help='Sets the median distance cutoff for consensus sequences.\
+                              Anything shorter will be excluded.')
     parser.add_argument('--output', '-o', type=str, action='store',
                         default='R2C2_Consensus.fasta',
                         help='FASTA file that the consensus gets written to.\
@@ -109,6 +115,10 @@ path = args['path']
 temp_folder = path + '/' + 'tmp1'
 input_file = args['reads']
 score_matrix = args['matrix']
+
+seqLenCutoff = args['slencutoff']
+medDistCutoff = args['mdistcutoff']
+
 out_file = args['output']
 figure = args['figure']
 subread_file = 'subreads.fastq'
@@ -534,7 +544,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     '''
     repeats = ''
     corrected_consensus = ''
-    if median_distance > 500 and len(peaks) > 1:
+    if median_distance > medDistCutoff and len(peaks) > 1:
         out_F = temp_folder + '/' + name + '_F.fasta'
         out_Fq = temp_folder + '/' + name + '_F.fastq'
         poa_cons = temp_folder + '/' + name + '_consensus.fasta'
@@ -706,7 +716,7 @@ def analyze_reads(read_list):
     Writes to R2C2_Consensus.fasta
     '''
     for name, seed, seq, qual, average_quals, seq_length in read_list:
-        if 1000 < seq_length:
+        if seqLenCutoff < seq_length:
             final_consensus = ''
             # score lists are made for sequence before and after the seed
             forward = seq[seed:]

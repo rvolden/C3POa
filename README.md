@@ -68,6 +68,10 @@ Options:
 
   -m  path to NUC.4.4.mat file (included in repository)
 
+  -s  Raw sequence length cutoff
+
+  -d  Median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation.
+
   -c  config file containing paths to poa, racon, water, blat, and minimap2. (format example poa[tab]/path/to/poa)
 
   -o  name (including path) of fasta file that the consensus gets written to. Defaults to R2C2_Consensus.fasta
@@ -76,7 +80,7 @@ Options:
 
 
 ```bash
-python3 C3POa.py -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -c /path/to/config_file -o /path/to/consensus.fasta
+python3 C3POa.py -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -s 1000 -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
 ```
 
 ### C3POa_postprocessing.py ###
