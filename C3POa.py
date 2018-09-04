@@ -15,7 +15,7 @@ Usage:
 Dependencies:
     Python 3.6
     NumPy 1.13.3
-    poa v1.0.0 Revision: 1.2.2.9
+    poa v1.0.0 Revision: 1.2.2.9500
     EMBOSS water: watHerON v8
     minimap2 2.7-r654
     racon
@@ -58,10 +58,10 @@ def argParser():
                               blat, and minimap2 if they are not in your path.')
     parser.add_argument('--slencutoff', '-s', type=int, action='store', default=1000,
                         help='Sets the length cutoff for your raw sequences. Anything\
-                              shorter than the cutoff will be excluded.')
+                              shorter than the cutoff will be excluded. Defaults to 1000.')
     parser.add_argument('--mdistcutoff', '-d', type=int, action='store', default=500,
                         help='Sets the median distance cutoff for consensus sequences.\
-                              Anything shorter will be excluded.')
+                              Anything shorter will be excluded. Defaults to 500.')
     parser.add_argument('--output', '-o', type=str, action='store',
                         default='R2C2_Consensus.fasta',
                         help='FASTA file that the consensus gets written to.\
