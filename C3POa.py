@@ -56,7 +56,7 @@ def argParser():
                         help='If you want to use a config file to specify paths to\
                               programs, specify them here. Use for poa, racon, water,\
                               blat, and minimap2 if they are not in your path.')
-    parser.add_argument('--slencutoff', '-s', type=int, action='store', default=1000,
+    parser.add_argument('--slencutoff', '-l', type=int, action='store', default=1000,
                         help='Sets the length cutoff for your raw sequences. Anything\
                               shorter than the cutoff will be excluded. Defaults to 1000.')
     parser.add_argument('--mdistcutoff', '-d', type=int, action='store', default=500,

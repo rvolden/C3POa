@@ -68,7 +68,7 @@ Options:
 
   -m  path to NUC.4.4.mat file (included in repository)
 
-  -s  raw sequence length cutoff. Defaults to 1000
+  -l  raw sequence length cutoff. Defaults to 1000
 
   -d  median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation. Defaults to 500
 
