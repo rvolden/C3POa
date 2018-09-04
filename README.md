@@ -68,9 +68,9 @@ Options:
 
   -m  path to NUC.4.4.mat file (included in repository)
 
-  -s  raw sequence length cutoff
+  -s  raw sequence length cutoff. Defaults to 1000
 
-  -d  median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation.
+  -d  median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation. Defaults to 500
 
   -c  config file containing paths to poa, racon, water, blat, and minimap2. (format example poa[tab]/path/to/poa)
 
