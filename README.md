@@ -64,13 +64,13 @@ Takes fastq output produced by C3POa_preprocessing.py and generates consensus se
 
 Options:
 
-  -p  Directory to which all temporary files will be written. Defaults to your current directory.
+  -p  directory to which all temporary files will be written. Defaults to your current directory.
 
   -m  path to NUC.4.4.mat file (included in repository)
 
-  -s  Raw sequence length cutoff
+  -s  raw sequence length cutoff
 
-  -d  Median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation.
+  -d  median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation.
 
   -c  config file containing paths to poa, racon, water, blat, and minimap2. (format example poa[tab]/path/to/poa)
 
