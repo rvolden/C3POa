@@ -684,30 +684,37 @@ def read_fastq_file(seq_file):
         average_quals : float, average quality of that line
         seq_length : int, length of the sequence
     '''
-    read_list = []
-    length = 0
+    read_list, lineNum = [], 0
+    lastPlus = False
     for line in open(seq_file):
-        length += 1
-    lineNum = 0
-    seq_file_open = open(seq_file, 'r')
-    while lineNum < length:
-        name_root = seq_file_open.readline().strip()[1:].split('_')
-        name, seed = name_root[0], int(name_root[1])
-        seq = seq_file_open.readline().strip()
-        plus = seq_file_open.readline().strip()
-        qual = seq_file_open.readline().strip()
-        quals = []
-        for character in qual:
-            number = ord(character) - 33
-            quals.append(number)
-        average_quals = np.average(quals)
-        seq_length = len(seq)
-        if seed == seq_length:
-            lineNum += 4
+        line = line.rstrip()
+        if not line:
             continue
-        else:
-            read_list.append((name, seed, seq, qual, average_quals, seq_length))
-        lineNum += 4
+        # make an entry as a list and append the header to that list
+        if lineNum % 4 == 0 and line[0] == '@':
+            splitLine = line[1:].split('_')
+            root, seed = splitLine[0], int(splitLine[1])
+            read_list.append([])
+            read_list[-1].append(root)
+            read_list[-1].append(seed)
+
+        # sequence
+        if lineNum % 4 == 1:
+            read_list[-1].append(line)
+
+        # quality header
+        if lineNum % 4 == 2:
+            lastPlus = True
+
+        # quality
+        if lineNum % 4 == 3 and lastPlus:
+            read_list[-1].append(line)
+            avgQ = sum([ord(x)-33 for x in line])/len(line)
+            read_list[-1].append(avgQ)
+            read_list[-1].append(len(read_list[-1][2]))
+            read_list[-1] = tuple(read_list[-1])
+
+        lineNum += 1
     return read_list
 
 def analyze_reads(read_list):
