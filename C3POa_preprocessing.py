@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 5 June 2018
+# Last updated: 10 Jan 2019
 
 import os
 import sys
