@@ -65,30 +65,40 @@ if args['config'] or args['c']:
 else:
     blat = 'blat'
 
-def read_and_filter_fastq(input_file):
-    length = 0
-    for line in open(input_file):
-        length += 1
-    iterator = 0
-    read_dict = {}
-    input1 = open(input_file, 'r')
-    while iterator < length:
-        a = input1.readline().strip()
-        b = input1.readline().strip()
-        c = input1.readline().strip()
-        d = input1.readline().strip()
-        quals = []
-        for character in d:
-            number = ord(character) - 33
-            quals.append(number)
-        average = np.average(quals)
-        name = a[1:].split()[0]
-        sequence = b
-        qual = d
-        if len(sequence) >= read_length_cutoff and average >= quality_cutoff:
-            read_dict[name] = (sequence, qual)
-        iterator += 4
-    return(read_dict)
+def read_and_filter_fastq_faster(fastqFile):
+    '''
+    Takes a FASTQ file and returns dictionary of lists
+    readDict {'name_root':['full_header', seq, quality]...}
+    '''
+    readDict = {}
+    lineNum, lastPlus, lastHead, skip = 0, False, '', False
+    for line in open(fastqFile):
+        line = line.rstrip()
+        if not line:
+            continue
+
+        if lineNum % 4 == 0 and line[0] == '@':
+            name = line[1:]
+            readDict[name], lastHead = [], name
+
+        if lineNum % 4 == 1:
+            readDict[lastHead].append(line)
+
+        if lineNum % 4 == 2:
+            lastPlus = True
+
+        if lineNum % 4 == 3 and lastPlus:
+            avgQ = sum([ord(x)-33 for x in line])/len(line)
+            sLen = len(readDict[lastHead][-1])
+            if avgQ >= quality_cutoff and sLen >= read_length_cutoff:
+                readDict[lastHead].append(line)
+                readDict[lastHead] = tuple(readDict[lastHead])
+            else:
+                del readDict[lastHead]
+            lastPlus, lastHead = False, ''
+
+        lineNum += 1
+    return readDict
 
 def run_blat(path, reads):
     fasta_file = path + '/R2C2_temp_for_BLAT.fasta'
