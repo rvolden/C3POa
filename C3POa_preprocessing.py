@@ -65,7 +65,7 @@ if args['config'] or args['c']:
 else:
     blat = 'blat'
 
-def read_and_filter_fastq_faster(fastqFile):
+def read_and_filter_fastq(fastqFile):
     '''
     Takes a FASTQ file and returns dictionary of lists
     readDict {'name_root':['full_header', seq, quality]...}
