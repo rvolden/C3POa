@@ -750,7 +750,7 @@ def analyze_reads(read_list):
                                 + '_' + str(len(final_consensus)))
                 final_out.write('\n' + final_consensus + '\n')
                 final_out.close()
-                os.system('rm ' + temp_folder+'/*')
+                os.system('rm ' + temp_folder + '/*')
 
 def main():
     '''Controls the flow of the program'''
