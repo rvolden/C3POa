@@ -183,23 +183,15 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
 def read_fasta(inFile):
     '''Reads in FASTA files, returns a dict of header:sequence'''
     readDict = {}
-    tempSeqs, headers, sequences = [], [], []
     for line in open(inFile):
         line = line.rstrip()
         if not line:
             continue
         if line.startswith('>'):
-            headers.append(line.split()[0][1:])
-        # covers the case where the file ends while reading sequences
-        if line.startswith('>'):
-            sequences.append(''.join(tempSeqs).upper())
-            tempSeqs = []
+            readDict[line[1:]] = ''
+            lastHead = line[1:]
         else:
-            tempSeqs.append(line)
-    sequences.append(''.join(tempSeqs).upper())
-    sequences = sequences[1:]
-    for i in range(len(headers)):
-        readDict[headers[i]] = sequences[i]
+            readDict[lastHead] += line
     return readDict
 
 def rounding(x, base):
