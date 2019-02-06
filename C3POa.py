@@ -146,7 +146,6 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
     '''
     out_F = open(out_file1, 'w')
     out_Fq = open(out_file1q, 'w')
-    distance = []
     for i in range(len(split_list) - 1):
         split1 = split_list[i]
         split2 = split_list[i+1]
@@ -584,7 +583,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
 
                 os.system('%s -q 5 -t 1 \
                           %s %s %s >%s 2>./racon_messages.txt' \
-                          %(racon,out_Fq, overlap, input_cons, output_cons))
+                          %(racon, out_Fq, overlap, input_cons, output_cons))
                 final = output_cons
             except:
                 pass
