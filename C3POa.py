@@ -66,6 +66,9 @@ def argParser():
                         default='R2C2_Consensus.fasta',
                         help='FASTA file that the consensus gets written to.\
                               Defaults to R2C2_Consensus.fasta')
+    parser.add_argument('--timer', '-t', type=bool, action='store',
+                        default=False, help='Prints how long each dependency takes to run.\
+                                             Defaults to False')
     parser.add_argument('--figure', '-f', type=bool, action='store', default=False,
                         help='Set to true if you want to output a histogram of scores.')
     return vars(parser.parse_args())
@@ -120,6 +123,7 @@ seqLenCutoff = args['slencutoff']
 medDistCutoff = args['mdistcutoff']
 
 out_file = args['output']
+timer = args['timer']
 figure = args['figure']
 subread_file = 'subreads.fastq'
 os.chdir(path)
@@ -533,6 +537,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     in the middle where you can try to salvage the flanking sequences to
     try and make a complete read
     '''
+    from time import time
     repeats = ''
     corrected_consensus = ''
     if median_distance > medDistCutoff and len(peaks) > 1:
@@ -545,9 +550,13 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         repeats = split_read(peaks, seq, out_F, qual, out_Fq, name)
 
         PIR = temp_folder + '/' + name + 'alignment.fasta'
+        poa_start = time()
         os.system('%s -read_fasta %s -hb -pir %s \
                   -do_progressive %s >./poa_messages.txt 2>&1' \
                   %(poa, out_F, PIR, score_matrix))
+        poa_stop = time()
+        if timer:
+            print('POA took ' + str(poa_stop - poa_start) + ' seconds to run.')
         reads = read_fasta(PIR)
 
         if repeats == '2':
@@ -556,8 +565,13 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
                 if 'CONSENS' not in read:
                     Qual_Fasta.write('>' + read + '\n' + reads[read] + '\n')
             Qual_Fasta.close()
+            conspy_start = time()
             os.system('%s %s %s %s >> %s' \
                       %(consensus, pairwise, out_Fq, name, poa_cons))
+            conspy_stop = time()
+            if timer:
+                print('consensus.py took ' + str(conspy_stop - conspy_start) \
+                      + ' seconds to run.')
 
         else:
             for read in reads:
@@ -576,14 +590,23 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
                 else:
                     input_cons = poa_cons.replace('.fasta', '_' + str(i-1) + '.fasta')
                     output_cons = poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
-
+                mm_start = time()
                 os.system('%s --secondary=no -ax map-ont \
                           %s %s > %s 2> ./minimap2_messages.txt' \
                           %(minimap2, input_cons, out_Fq, overlap))
+                mm_stop = time()
+                if timer:
+                    print('minimap2 took ' + str(mm_stop - mm_start) \
+                          + ' seconds to run.')
 
+                racon_start = time()
                 os.system('%s -q 5 -t 1 \
                           %s %s %s >%s 2>./racon_messages.txt' \
                           %(racon, out_Fq, overlap, input_cons, output_cons))
+                racon_stop = time()
+                if timer:
+                    print('Racon took ' + str(racon_stop - racon_start) \
+                          + ' seconds to run.')
                 final = output_cons
             except:
                 pass
@@ -613,8 +636,14 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         tempFastq.close()
         alignedFasta = temp_folder + '/partial.fasta'
         fromConsensus = temp_folder + '/' + name + '_fromConsensus.fasta'
+        zero_cons_start = time()
         os.system('%s %s %s > %s'
                   %(consensus, alignedFasta, tempFastqName, fromConsensus))
+        zero_cons_stop = time()
+        if timer:
+            print('Zero repeat consensus.py took ' \
+                  + str(zero_cons_stop - zero_cons_start) \
+                  + ' seconds to run.')
         toGetConsensus = read_fasta(fromConsensus)
         seqFromCons = toGetConsensus['consensus']
         # put all the pieces back together to make the consensus
