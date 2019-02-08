@@ -58,6 +58,22 @@ Options (All required):
 python3 C3POa_preprocessing.py -i raw_reads.fastq -o output_path -q quality_cutoff -l read_length_cutoff -s Splint_sequence.fasta
 ```
 
+Example input read:
+```
+@63f115bc-6a91-42bd-a78a-667fd8255069
+ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA
++
+"01&%"."I;"CSA"qr{X"uvc"\n"ggZ"Swj"yq"{wD"{z
+```
+
+Example output read (10 would be a split position):
+```
+@63f115bc-6a91-42bd-a78a-667fd8255069_10
+ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA
++
+"01&%"."I;"CSA"qr{X"uvc"\n"ggZ"Swj"yq"{wD"{z
+```
+
 ### C3POa.py ###
 
 Takes fastq output produced by C3POa_preprocessing.py and generates consensus sequences in fasta format and a subread sequences in fastq format.
@@ -81,6 +97,12 @@ Options:
 
 ```bash
 python3 C3POa.py -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -s 1000 -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
+```
+
+Example output read (readName_averageQuality_originalReadLength_numberOfRepeats_subreadLength):
+```
+>efbfbf09-7e2b-48e6-8e57-b3d36886739c_46.53_5798_2_1844
+ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA...
 ```
 
 ### C3POa_postprocessing.py ###
