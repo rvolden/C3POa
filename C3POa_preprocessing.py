@@ -78,7 +78,7 @@ def read_and_filter_fastq(fastqFile):
             continue
 
         if lineNum % 4 == 0 and line[0] == '@':
-            name = line[1:]
+            name = line[1:].split()[0]
             readDict[name], lastHead = [], name
 
         if lineNum % 4 == 1:
