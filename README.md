@@ -66,7 +66,7 @@ ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA
 "01&%"."I;"CSA"qr{X"uvc"\n"ggZ"Swj"yq"{wD"{z
 ```
 
-Example output read (10 would be a split position):
+Example output read (10 would be a splint position):
 ```
 @63f115bc-6a91-42bd-a78a-667fd8255069_10
 ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA
