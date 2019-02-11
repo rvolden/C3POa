@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 2 Aug 2018
+# Last updated: 11 Feb 2019
 
 '''
 Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
@@ -35,6 +35,7 @@ import os
 import sys
 import numpy as np
 import argparse
+from time import time
 
 def argParser():
     '''Parses arguments.'''
@@ -65,12 +66,14 @@ def argParser():
     parser.add_argument('--output', '-o', type=str, action='store',
                         default='R2C2_Consensus.fasta',
                         help='FASTA file that the consensus gets written to.\
-                              Defaults to R2C2_Consensus.fasta')
-    parser.add_argument('--timer', '-t', type=bool, action='store',
-                        default=False, help='Prints how long each dependency takes to run.\
-                                             Defaults to False')
-    parser.add_argument('--figure', '-f', type=bool, action='store', default=False,
-                        help='Set to true if you want to output a histogram of scores.')
+                              Defaults to R2C2_Consensus.fasta.')
+    parser.add_argument('--zero', '-z', action='store_false', default=True,
+                        help='Use to exclude zero repeat reads. Defaults to True (includes zero repeats).')
+    parser.add_argument('--timer', '-t', action='store_true', default=False,
+                        help='Prints how long each dependency takes to run.\
+                              Defaults to False.')
+    parser.add_argument('--figure', '-f', action='store_true', default=False,
+                        help='Use if you want to output a histogram of scores.')
     return vars(parser.parse_args())
 
 def configReader(configIn):
@@ -123,6 +126,7 @@ seqLenCutoff = args['slencutoff']
 medDistCutoff = args['mdistcutoff']
 
 out_file = args['output']
+zero_repeat = args['zero']
 timer = args['timer']
 figure = args['figure']
 subread_file = 'subreads.fastq'
@@ -450,15 +454,22 @@ def run_water(step, seq1, seq2, totalLen, diag_dict, diag_set):
     Runs water using the parameters given by split_SW
     '''
     diagonal = 'no'
-    if step == 0:
+    if step == 0 or step == -1:
         diagonal = 'yes'
 
     x_limit, y_limit = len(seq1), len(seq2)
-
+    water_start = time()
     os.system('%s -asequence seq1.fasta -bsequence seq2.fasta \
               -datafile EDNAFULL -gapopen 25 -outfile=%s/align.whatever \
               -gapextend 1  %s %s %s >./sw.txt 2>&1' \
               %(water, temp_folder, diagonal, x_limit, y_limit))
+    water_stop = time()
+    if timer and step == -1 and zero_repeat:
+        print('Water took ' + str(water_stop - water_start) \
+              + ' seconds to run (Zero repeat).')
+    elif timer:
+        print('Water took ' + str(water_stop - water_start) \
+              + ' seconds to run.')
     matrix_file = 'SW_PARSE.txt'
     diag_set, diag_dict = parse_file(matrix_file, totalLen, step, \
                                      diag_set, diag_dict)
@@ -489,7 +500,7 @@ def split_SW(name, seq, step):
 
             run_water(step, seq1, seq2, totalLen, diag_dict, diag_set)
     else:
-        step = 0
+        step = -1
         align_file1 = open('seq1.fasta', 'w')
         align_file1.write('>' + name + '\n' + seq + '\n')
         align_file1.close()
@@ -537,7 +548,6 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     in the middle where you can try to salvage the flanking sequences to
     try and make a complete read
     '''
-    from time import time
     repeats = ''
     corrected_consensus = ''
     if median_distance > medDistCutoff and len(peaks) > 1:
@@ -616,7 +626,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
             corrected_consensus = reads[read]
 
     # reads that have the potential for a partial consensus
-    elif len(peaks) == 1:
+    elif len(peaks) == 1 and zero_repeat:
         # before/after positions are the alignment start/end positions for
         # both portions of the sequence
         beforeIndeces, afterIndeces = water_parser()
@@ -753,7 +763,7 @@ def analyze_reads(read_list):
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(score_list_f, score_list_r, seed)
 
-            if len(peaks) == 1:
+            if len(peaks) == 1 and zero_repeat:
                 scoreList = split_SW(name, seq, step=False)
                 slr = []
                 peaks, median_distance = callPeaks(scoreList, slr, seed)
@@ -764,7 +774,7 @@ def analyze_reads(read_list):
 
             if figure and len(peaks) > 1:
                 makeFig(score_list_f, score_list_r, peaks, seed, median_distance)
-            if figure and len(peaks) == 1:
+            if figure and len(peaks) == 1 and zero_repeat:
                 makeFigPartial(scoreList, peaks, seed, median_distance)
 
             final_consensus, repeats1 = determine_consensus(name, seq, peaks, \
