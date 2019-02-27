@@ -50,13 +50,14 @@ Options (All required):
 
   -l  only reads longer than this number will be retained (1000 recommended)
 
-  -s  sequence of DNA splint used in R2C2 protocol in fasta format. Sequence name must contained the string 'Splint'
+  -s  sequence of DNA splint used in R2C2 protocol in fasta format
 
   -c  config file containing path to BLAT binary
 ```
 
 ```bash
-python3 C3POa_preprocessing.py -i raw_reads.fastq -o output_path -q quality_cutoff -l read_length_cutoff -s Splint_sequence.fasta
+python3 C3POa_preprocessing.py -i raw_reads.fastq -o output_path -q quality_cutoff
+                               -l read_length_cutoff -s Splint_sequence.fasta
 ```
 
 Example input read:
