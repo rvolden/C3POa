@@ -1,17 +1,18 @@
 # C3POa
-Computational pipeline for calling consensi on R2C2 nanopore data.
+C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.
 
 ### Dependencies ###
 - [Python 3.6](https://www.python.org/downloads/)
 - [NumPy 1.13.3](https://scipy.org/install.html)
 - [poa v1.0.0 Revision: 1.2.2.9](https://github.com/tanghaibao/bio-pipeline)
-- [EMBOSS water: watHerON v8](https://users.soe.ucsc.edu/~rvolden/C3POa/EMBOSS-6.6.0_v8.tar.gz)
+- [Go](https://golang.org/dl/)
+- [gonk](https://github.com/rvolden/gonk)
 - [minimap2 2.7-r654](https://github.com/lh3/minimap2)
 - [racon](https://github.com/isovic/racon)
 - [blat source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or [blat executable](http://hgdownload.soe.ucsc.edu/admin/exe/)
 
 To install dependencies, use setup.sh.  
-setup.sh will download and make all of the packages that you need to run C3POa (except Python, NumPy and blat).  
+setup.sh will download and make the packages that you need to run C3POa (except Python, NumPy, Go, and blat).  
 You don't need to have these in your PATH, but if you don't, you'll need to use a [config file](example_config).
 ```bash
 chmod +x setup.sh
