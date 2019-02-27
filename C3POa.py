@@ -62,7 +62,7 @@ def argParser():
                               Defaults to NUC.4.4.mat.')
     parser.add_argument('--config', '-c', type=str, action='store', default='',
                         help='If you want to use a config file to specify paths to\
-                              programs, specify them here. Use for poa, racon, water,\
+                              programs, specify them here. Use for poa, racon, gonk,\
                               blat, and minimap2 if they are not in your path.')
     parser.add_argument('--slencutoff', '-l', type=int, action='store', default=1000,
                         help='Sets the length cutoff for your raw sequences. Anything\
@@ -89,9 +89,9 @@ def configReader(configIn):
             continue
         line = line.rstrip().split('\t')
         progs[line[0]] = line[1]
-    # should have minimap, poa, racon, water, consensus
+    # should have minimap, poa, racon, gonk, consensus
     # check for extra programs that shouldn't be there
-    possible = set(['poa', 'minimap2', 'water', 'consensus', 'racon', 'blat'])
+    possible = set(['poa', 'minimap2', 'gonk', 'consensus', 'racon', 'blat'])
     inConfig = set()
     for key in progs.keys():
         inConfig.add(key)
@@ -115,14 +115,14 @@ if args['config']:
     minimap2 = progs['minimap2']
     poa = progs['poa']
     racon = progs['racon']
-    water = progs['water']
+    gonk = progs['gonk']
     consensus = progs['consensus']
 else:
-    minimap2, poa, racon, water = 'minimap2', 'poa', 'racon', 'water'
+    minimap2, poa, racon, gonk = 'minimap2', 'poa', 'racon', 'gonk'
     consensus = 'consensus.py'
 
 consensus = 'python3 ' + consensus
-path = args['path']
+path = args['path'] + '/'
 temp_folder = path + '/' + 'tmp1'
 input_file = args['reads']
 score_matrix = args['matrix']
@@ -131,7 +131,6 @@ seqLenCutoff = args['slencutoff']
 medDistCutoff = args['mdistcutoff']
 
 out_file = args['output']
-zero_repeat = args['zero']
 timer = args['timer']
 figure = args['figure']
 subread_file = 'subreads.fastq'
@@ -210,56 +209,30 @@ def rounding(x, base):
     '''Rounds to the nearest base, we use 50'''
     return int(base * round(float(x)/base))
 
-def makeFig(scoreList_F, scoreList_R, peakList_R, seed, filtered_peaks):
-    import matplotlib as mpl
+def makeFig(scoreList, peaks, seed, filtered_peaks):
     import matplotlib.pyplot as plt
     import matplotlib.patches as mplpatches
-    # plt.style.use('BME163')
+    plt.style.use('BME163')
     plt.figure(figsize = (10, 5))
     hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
 
     xlist = [x for x in range(0, len(filtered_peaks))]
-    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), \
+    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255),
               lw = 1, zorder = 550)
-    ylim = max(scoreList_F) * 1.1
-    ymin = min(filtered_peaks)*1.1
-    xlim = (len(scoreList_F) + seed)
-    wholeSeq = mplpatches.Rectangle((0, -15000), xlim, 30000, lw = 0, \
-                                    fc = 'grey', zorder = 1000)
-    hist.add_patch(wholeSeq)
-    for i in range(seed, xlim):
-        if np.in1d(i, peakList_R):
-            color = (0.3, 0.3, 0.3)
-            if i == seed:
-                color = 'black'
-            bar1 = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim, \
-                                        lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
-            hist.add_patch(bar1) # 253/255, 177/255, 85/255
-            splint = mplpatches.Rectangle((i-150, -15000), 300, 30000, \
-                                          lw = 0, fc = color, zorder = 1100)
-            hist.add_patch(splint)
-        else:
-            bar3 = mplpatches.Rectangle((i, 0), 3, scoreList_F[i-seed], lw = 0, \
-                                       facecolor = (0, 191/255, 165/255), zorder = 100)
-            hist.add_patch(bar3)
+    ylim = max(scoreList) * 1.1
+    ymin = min(filtered_peaks)*1.5
+    xlim = len(scoreList)
 
-    for j in range(len(scoreList_R), 1, -1):
-        if np.in1d(j, peakList_R):
-            color = (0.3, 0.3, 0.3)
-            if i == seed:
-                color = 'black'
-            bar5 = mplpatches.Rectangle((j-12.5, 0), 25, -ylim, lw = 0, \
-                                        fc = (0.96, 0.43, 0.2), zorder = 0)
-            hist.add_patch(bar5)
-            splint = mplpatches.Rectangle((j-150, -15000), 300, 30000, lw = 0, \
-                                          fc = color, zorder = 1100)
-            hist.add_patch(splint)
-        try:
-            bar6 = mplpatches.Rectangle((j, 0), 3, -scoreList_R[seed-j], lw = 0, \
-                                       facecolor = (0, 191/255, 165/255), zorder = 100)
-            hist.add_patch(bar6)
-        except IndexError:
-            pass
+    for i in range(len(scoreList)):
+        if np.in1d(i, peaks):
+            color = (0.96, 0.43, 0.2)
+            peakMark = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim,
+                                            lw=0, fc=color, zorder=0)
+            hist.add_patch(peakMark)
+        color = (0, 191/255, 165/255)
+        score = mplpatches.Rectangle((i, 0), 1, scoreList[i],
+                                     lw=0, fc=color, zorder=100)
+        hist.add_patch(score)
 
     hist.set_ylim(ymin, ylim)
     hist.set_xlim(0, xlim)
@@ -324,93 +297,45 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False
     la = 45 # how far in sequence to look ahead
     for i in range(len(slopes) - 50):
         if i > len(slopes) - la: # probably irrelevant now
-            dec = all(slopes[i+x] < 0 for x in range(1, 50))
+            dec = all(slopes[i+x] <= 0 for x in range(1, 50))
             if slopes[i] > 0 and dec:
                 if i not in peaks:
                     peaks.append(i)
         else:
-            dec = all(slopes[i+x] < 0 for x in range(1, la))
+            dec = all(slopes[i+x] <= 0 for x in range(1, la))
             if slopes[i] > 0 and dec:
                 peaks.append(i)
     return peaks
 
-def callPeaks(scoreListF, scoreListR, seed):
+def callPeaks(scoreList):
     '''
-    scoreListF : list of forward scores
-    scoreListR : list of reverse scores
-    seed : position of the first occurrence of the splint
+    scoreList : list of scores
     returns a sorted list of all peaks
     '''
-    allPeaks = []
-    allPeaks.append(seed)
-    # Filter out base level noise in forward scores
-    if not scoreListF:
-        smoothedScoresF = []
-    else:
-        noise = 0
-        try:
-            for i in range(500):
-                if scoreListF[i] > noise:
-                    noise = scoreListF[i]
-            for j in range(len(scoreListF)):
-                if scoreListF[j] <= noise*1.25:
-                    scoreListF[j] = 1
-        except IndexError:
-            pass
-        # Smooth over the data multiple times
-        smoothedScoresF = savitzky_golay(scoreListF, 51, 2, deriv = 0, \
-                                         rate = 1, returnScoreList = True)
-        for iteration in range(3):
-            smoothedScoresF = savitzky_golay(smoothedScoresF, 71, 2, deriv = 0, \
-                                             rate = 1, returnScoreList = True)
-        peaksF = savitzky_golay(smoothedScoresF, 51, 1, deriv = 0, \
-                                rate = 1, returnScoreList = False)
-        # Add all of the smoothed peaks to list of all peaks
-        peaksFAdj = list(seed + np.array(peaksF))
-        allPeaks += peaksFAdj
+    maxScore = max(scoreList)
+    noise = maxScore*0.05
 
-    # Covers the case where the seed is 0
-    if not scoreListR:
-        smoothedScoresR = []
-    # Do the same-ish thing for the reverse peaks
-    else:
-        noise = 0
-        try:
-            for i in range(100):
-                if scoreListR[i] > noise:
-                    noise = scoreListR[i]
-            for j in range(len(scoreListR)):
-                if scoreListR[j] <= noise*1.15:
-                    scoreListR[j] = 1
-        except IndexError:
-            pass
-        smoothedScoresR = savitzky_golay(scoreListR, 51, 2, deriv = 0, \
-                                         rate = 1, returnScoreList = True)
-        for iteration in range(3):
-            smoothedScoresR = savitzky_golay(smoothedScoresR, 71, 2, deriv = 0, \
-                                             rate = 1, returnScoreList = True)
-        peaksR = savitzky_golay(smoothedScoresR, 51, 1, deriv = 0, \
-                                rate = 1, returnScoreList = False)
-        peaksRAdj = list(seed - np.array(peaksR))
-        allPeaks += peaksRAdj
+    for j in range(len(scoreList)):
+        if scoreList[j] <= noise:
+            scoreList[j] = 1
 
-    smoothedPeaks = []
-    for thing in [-x for x in smoothedScoresR[::-1]]:
-        smoothedPeaks.append(thing)
-    for thing in smoothedScoresF:
-        smoothedPeaks.append(thing)
-    sortedPeaks = sorted(list(set(allPeaks)))
+    # Smooth over the data
+    smoothedScores = savitzky_golay(scoreList, 21, 2, deriv = 0,
+                                     rate = 1, returnScoreList = True)
+    peaks = savitzky_golay(smoothedScores, 51, 1, deriv = 0,
+                            rate = 1, returnScoreList = False)
+    # Add all of the smoothed peaks to list of all peaks
+    sortedPeaks = sorted(list(set(peaks)))
 
-    finalPeaks = []
-    for i in range(0, len(sortedPeaks)):
-        if i == 0:
-            finalPeaks.append(sortedPeaks[i])
-        elif sortedPeaks[i-1] < sortedPeaks[i] < sortedPeaks[i-1] + 200:
+    finalPeaks = [sortedPeaks[0]]
+    for i in range(1, len(sortedPeaks)):
+        if sortedPeaks[i-1] < sortedPeaks[i] < sortedPeaks[i-1] + 100:
             continue
         else:
             finalPeaks.append(sortedPeaks[i])
     if figure:
-        return finalPeaks, smoothedPeaks
+        return finalPeaks, smoothedScores
+
     # calculates the median distance between detected peaks
     forMedian = []
     for i in range(len(finalPeaks) - 1):
@@ -419,128 +344,62 @@ def callPeaks(scoreListF, scoreListR, seed):
     medianDistance = np.median(forMedian)
     return finalPeaks, medianDistance
 
-def water_parser():
+def parse_file(scores):
     '''
-    Parses the water output and returns the indeces where the read starts
-    repeating on itself. Used for determining where to start the partial
-    consensus reads because peaks are not base accurate.
-    Also writes the sequences themselves to a file because I need the gaps
-    to use consensus.py to make a better partial consensus.
+    scores : gonk output file
+    Returns:
+        scoreList : list, diagonal alignment scores
     '''
-    alignFile, lineNum = temp_folder + '/align.whatever', 0
-    posFirstSeq, posSecondSeq = [], []
-    # temporary lists to build the sequences with gaps
-    tempFirst, tempSecond = [], []
-    for line in open(alignFile):
-        line = line.strip()
-        if not line or line.startswith('#') or '|' in line:
-            continue
-        seq = line.split()[2]
-        if lineNum % 2 == 0:
-            tempFirst.append(seq)
-            posFirstSeq.append(int(line.split()[1]))
-            posFirstSeq.append(int(line.split()[3]))
-        else:
-            tempSecond.append(seq)
-            posSecondSeq.append(int(line.split()[1]))
-            posSecondSeq.append(int(line.split()[3]))
-        lineNum += 1
-    partialConsensus = open(temp_folder + '/partial.fasta', 'w+')
-    partialConsensus.write('>First' + '\n' + ''.join(tempFirst) + '\n')
-    partialConsensus.write('>Second' + '\n' + ''.join(tempSecond))
-    partialConsensus.close()
-    firstSeqIndeces = (posFirstSeq[0] - 1, posFirstSeq[-1] - 1)
-    secondSeqIndeces = (posSecondSeq[0] - 1, posSecondSeq[-1] - 1)
+    scoreList = []
+    for line in open(scores):
+        line = line.rstrip().split(':')
+        value = int(line[1])
+        scoreList.append(value)
+    return scoreList
 
-    return firstSeqIndeces, secondSeqIndeces
+def runGonk(seq1, seq2):
+    '''Runs gonk using the sequences given by split_SW'''
+    go_start = time()
+    os.system('{0} -a seq1.fasta -b seq2.fasta -p 20 &>>gonk_messages'.format(gonk))
+    go_stop = time()
+    if timer:
+        print('gonk took ' + str(go_stop - go_start) + ' seconds to run.')
+    scores = 'SW_PARSE.txt'
+    scoreList = parse_file(scores)
+    os.system('rm {0}'.format(scores))
+    return scoreList
 
-def run_water(step, seq1, seq2, totalLen, diag_dict, diag_set):
+def split_SW(name, seed, seq):
     '''
-    Runs water using the parameters given by split_SW
-    '''
-    diagonal = 'no'
-    if step == 0 or step == -1:
-        diagonal = 'yes'
-
-    x_limit, y_limit = len(seq1), len(seq2)
-    water_start = time()
-    os.system('%s -asequence seq1.fasta -bsequence seq2.fasta \
-              -datafile EDNAFULL -gapopen 25 -outfile=%s/align.whatever \
-              -gapextend 1  %s %s %s >./sw.txt 2>&1' \
-              %(water, temp_folder, diagonal, x_limit, y_limit))
-    water_stop = time()
-    if timer and step == -1 and zero_repeat:
-        print('Water took ' + str(water_stop - water_start) \
-              + ' seconds to run (Zero repeat).')
-    elif timer:
-        print('Water took ' + str(water_stop - water_start) \
-              + ' seconds to run.')
-    matrix_file = 'SW_PARSE.txt'
-    diag_set, diag_dict = parse_file(matrix_file, totalLen, step, \
-                                     diag_set, diag_dict)
-    os.system('rm SW_PARSE.txt SW_PARSE_PARTIAL.txt sw.txt')
-    return diag_set, diag_dict
-
-def split_SW(name, seq, step):
-    '''
-    Takes a sequence and does the water alignment to itself
+    Takes a sequence and does the gonk alignment to itself
     Returns a list of scores from summing diagonals from the
     alignment matrix.
     name (str): the sequence header
     seq (str): nucleotide sequence
-    step (bool): if false, aligns entire sequence to itself
     '''
-    totalLen = len(seq)
-    diag_dict, diag_set = {}, set()
-    if step:
-        for step in range(0, len(seq), 1000):
-            seq1 = seq[step:min(len(seq), step + 1000)]
-            seq2 = seq[:1000]
-            align_file1 = open('seq1.fasta', 'w')
-            align_file1.write('>' + name + '\n' + seq1 + '\n')
-            align_file1.close()
-            align_file2 = open('seq2.fasta', 'w')
-            align_file2.write('>' + name + '\n' + seq2 + '\n')
-            align_file2.close()
-
-            run_water(step, seq1, seq2, totalLen, diag_dict, diag_set)
+    total = len(seq)
+    reverse = False
+    if seed + 1000 > total:
+        start = max(0, seed-1000)
+        seq1 = revComp(seq[start:seed])
+        seq = revComp(seq)
+        reverse = True
     else:
-        step = -1
-        align_file1 = open('seq1.fasta', 'w')
-        align_file1.write('>' + name + '\n' + seq + '\n')
-        align_file1.close()
-        align_file2 = open('seq2.fasta', 'w')
-        align_file2.write('>' + name + '\n' + seq + '\n')
-        align_file2.close()
+        seq1 = seq[seed:seed+1000]
 
-        run_water(step, seq, seq, totalLen, diag_dict, diag_set)
+    align_file1 = open('seq1.fasta', 'w')
+    align_file1.write('>' + name + '\n' + seq1 + '\n')
+    align_file1.close()
+    align_file2 = open('seq2.fasta', 'w')
+    align_file2.write('>' + name + '\n')
+    for i in range(0, len(seq), 5000):
+        align_file2.write(seq[i:i+5000] + '\n')
+    align_file2.close()
 
-    diag_set = sorted(list(diag_set))
-    plot_list = []
-    for diag in diag_set:
-        plot_list.append(diag_dict[diag])
-    return plot_list
-
-def parse_file(matrix_file, seq_length, step, diag_set, diag_dict):
-    '''
-    matrix_file : watHerON output file
-    seq_length : int, length of the sequence
-    step : int, some position
-    Returns:
-        diag_set : set, positions
-        diag_dict : dict, position : diagonal alignment scores
-    '''
-    for line in open(matrix_file):
-        line = line.strip().split(':')
-        position = int(line[0]) + step
-        position = np.abs(position)
-        value = int(line[1]) # actual score
-        diag_set.add(position)
-        try:
-            diag_dict[position] += value
-        except:
-            diag_dict[position] = value
-    return diag_set, diag_dict
+    scoreList = runGonk(seq1, seq)
+    if reverse:
+        scoreList = scoreList[::-1]
+    return scoreList
 
 def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     '''
@@ -549,13 +408,10 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     alignment with racon correction
     If there are two repeats, it'll do the special pairwise consensus
     making
-    Otherwise, it'll try to make a 0 repeat consensus: reads with a splint
-    in the middle where you can try to salvage the flanking sequences to
-    try and make a complete read
     '''
     repeats = ''
     corrected_consensus = ''
-    if median_distance > medDistCutoff and len(peaks) > 1:
+    if median_distance > medDistCutoff and len(peaks) >= 1:
         out_F = temp_folder + '/' + name + '_F.fasta'
         out_Fq = temp_folder + '/' + name + '_F.fastq'
         poa_cons = temp_folder + '/' + name + '_consensus.fasta'
@@ -567,7 +423,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         PIR = temp_folder + '/' + name + 'alignment.fasta'
         poa_start = time()
         os.system('%s -read_fasta %s -hb -pir %s \
-                  -do_progressive %s >./poa_messages.txt 2>&1' \
+                  -do_progressive %s &>>poa_messages' \
                   %(poa, out_F, PIR, score_matrix))
         poa_stop = time()
         if timer:
@@ -597,116 +453,30 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
                 out_cons_file.close()
 
         final = poa_cons
-        for i in np.arange(1, 2, 1):
-            try:
-                if i == 1:
-                    input_cons = poa_cons
-                    output_cons = poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
-                else:
-                    input_cons = poa_cons.replace('.fasta', '_' + str(i-1) + '.fasta')
-                    output_cons = poa_cons.replace('.fasta', '_' + str(i) + '.fasta')
-                mm_start = time()
-                os.system('%s --secondary=no -ax map-ont \
-                          %s %s > %s 2> ./minimap2_messages.txt' \
-                          %(minimap2, input_cons, out_Fq, overlap))
-                mm_stop = time()
-                if timer:
-                    print('minimap2 took ' + str(mm_stop - mm_start) \
-                          + ' seconds to run.')
-
-                racon_start = time()
-                os.system('%s -q 5 -t 1 \
-                          %s %s %s >%s 2>./racon_messages.txt' \
-                          %(racon, out_Fq, overlap, input_cons, output_cons))
-                racon_stop = time()
-                if timer:
-                    print('Racon took ' + str(racon_stop - racon_start) \
-                          + ' seconds to run.')
-                final = output_cons
-            except:
-                pass
+        input_cons = poa_cons
+        output_cons = poa_cons.replace('.fasta', '_1.fasta')
+        mm_start = time()
+        os.system('%s --secondary=no -ax map-ont \
+                  %s %s > %s 2> ./minimap2_messages' \
+                  %(minimap2, input_cons, out_Fq, overlap))
+        mm_stop = time()
+        if timer:
+            print('minimap2 took ' + str(mm_stop - mm_start) \
+                  + ' seconds to run.')
+        racon_start = time()
+        os.system('%s -q 5 -t 1 \
+                  %s %s %s >%s 2>./racon_messages' \
+                  %(racon, out_Fq, overlap, input_cons, output_cons))
+        racon_stop = time()
+        if timer:
+            print('Racon took ' + str(racon_stop - racon_start) \
+                  + ' seconds to run.')
+        final = output_cons
         print(final)
         reads = read_fasta(final)
         for read in reads:
             corrected_consensus = reads[read]
-
-    # reads that have the potential for a partial consensus
-    elif len(peaks) == 1 and zero_repeat:
-        # before/after positions are the alignment start/end positions for
-        # both portions of the sequence
-        beforeIndeces, afterIndeces = water_parser()
-        endPortion = seq[beforeIndeces[1]:seed]
-        begPortion = seq[seed:afterIndeces[0]]
-
-        # make a temporary FASTQ file for consensus.py with portions
-        # of reads that match itself
-        tempFastqName = temp_folder + '/' + name + 'consensusFastq.fastq'
-        tempFastq = open(tempFastqName, 'w+')
-        tempFastq.write('@' + name + '\n'
-                        + seq[beforeIndeces[0]:beforeIndeces[1] + 1] + '\n+\n'
-                        + qual[beforeIndeces[0]:beforeIndeces[1] + 1] + '\n'
-                        + '@' + name + '\n'
-                        + seq[afterIndeces[0]:afterIndeces[1] + 1] + '\n+\n'
-                        + qual[afterIndeces[0]:afterIndeces[1] + 1])
-        tempFastq.close()
-        alignedFasta = temp_folder + '/partial.fasta'
-        fromConsensus = temp_folder + '/' + name + '_fromConsensus.fasta'
-        zero_cons_start = time()
-        os.system('%s %s %s > %s'
-                  %(consensus, alignedFasta, tempFastqName, fromConsensus))
-        zero_cons_stop = time()
-        if timer:
-            print('Zero repeat consensus.py took ' \
-                  + str(zero_cons_stop - zero_cons_start) \
-                  + ' seconds to run.')
-        toGetConsensus = read_fasta(fromConsensus)
-        seqFromCons = toGetConsensus['consensus']
-        # put all the pieces back together to make the consensus
-        corrected_consensus = begPortion + seqFromCons + endPortion
-        repeats = '0'
-
     return corrected_consensus, repeats
-
-def makeFigPartial(scoreList, peakList, seed, filtered_peaks):
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as mplpatches
-    plt.figure(figsize = (10, 5))
-    hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
-
-    xlist = [x for x in range(0, len(filtered_peaks))]
-    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255), \
-              lw = 1, zorder = 5000)
-
-    ylim = max(scoreList) * 1.1
-    ymin = 0
-    xlim = len(scoreList)
-
-    for i in range(xlim):
-        if np.in1d(i, peakList):
-            color = (0.3, 0.3, 0.3)
-            peakMark = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim, \
-                                            lw = 0, fc = (0.96, 0.43, 0.2), zorder = 0)
-            hist.add_patch(peakMark) # 253/255, 177/255, 85/255
-        else:
-            scoreVal = mplpatches.Rectangle((i, 0), 3, scoreList[i], lw = 0, \
-                                            facecolor = (0, 191/255, 165/255), zorder = 100)
-            hist.add_patch(scoreVal)
-
-    hist.set_ylim(ymin, ylim)
-    hist.set_xlim(0, xlim)
-    hist.set_xticks(range(0, xlim, 50))
-    hist.set_xticklabels(range(0, xlim, 50), fontsize=4, rotation=90)
-    hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
-    hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
-    hist.tick_params(axis='both',which='both',\
-                     bottom='on', labelbottom='on',\
-                     left='on', labelleft='on',\
-                     right='off', labelright='off',\
-                     top='off', labeltop='off')
-    plt.savefig('peakTest.png', dpi = 600)
-    plt.close()
-    sys.exit()
 
 def read_fastq_file(seq_file):
     '''
@@ -760,36 +530,22 @@ def analyze_reads(read_list):
     for name, seed, seq, qual, average_quals, seq_length in read_list:
         if seqLenCutoff < seq_length:
             final_consensus = ''
-            # score lists are made for sequence before and after the seed
-            forward = seq[seed:]
-            score_list_f = split_SW(name, forward, step=True)
-            reverse = revComp(seq[:seed])
-            score_list_r = split_SW(name, reverse, step=True)
+            scoreList = split_SW(name, seed, seq)
             # calculate where peaks are and the median distance between them
-            peaks, median_distance = callPeaks(score_list_f, score_list_r, seed)
+            peaks, median_distance = callPeaks(scoreList)
 
-            if len(peaks) == 1 and zero_repeat:
-                scoreList = split_SW(name, seq, step=False)
-                slr = []
-                peaks, median_distance = callPeaks(scoreList, slr, seed)
-                if len(peaks) == 2:
-                    peaks.remove(seed)
-                else:
-                    continue
+            if figure:
+                makeFig(scoreList, peaks, seed, median_distance)
 
-            if figure and len(peaks) > 1:
-                makeFig(score_list_f, score_list_r, peaks, seed, median_distance)
-            if figure and len(peaks) == 1 and zero_repeat:
-                makeFigPartial(scoreList, peaks, seed, median_distance)
-
-            final_consensus, repeats1 = determine_consensus(name, seq, peaks, \
-                                                            qual, median_distance, \
-                                                            seed)
+            # make the consensus
+            final_consensus, repeats = determine_consensus(name, seq, peaks,
+                                                           qual, median_distance,
+                                                           seed)
             if final_consensus:
                 final_out = open(out_file, 'a')
                 final_out.write('>' + name + '_' \
                                 + str(round(average_quals, 2)) + '_' \
-                                + str(seq_length) + '_' + str(repeats1) \
+                                + str(seq_length) + '_' + str(repeats) \
                                 + '_' + str(len(final_consensus)))
                 final_out.write('\n' + final_consensus + '\n')
                 final_out.close()
