@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 11 Feb 2019
+# Last updated: 27 Feb 2019
 
 '''
 Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
@@ -16,7 +16,7 @@ Dependencies:
     Python 3.6
     NumPy 1.13.3
     poa v1.0.0 Revision: 1.2.2.9500
-    EMBOSS water: watHerON v8
+    gonk
     minimap2 2.7-r654
     racon
 
@@ -29,6 +29,13 @@ Dependencies:
     read. These reads are very similar to normal 1D reads, but there are a few
     cases where there is a slight improvement. There will be an option to
     remove these reads in postprocessing.
+
+02/27/2019 Release note:
+    I have changed the aligner to gonk over water for faster alignments. Because
+    gonk does not do a complete alignment, I have removed support for zero repeat
+    reads. This is because zero repeat reads only increase the number of reads
+    you end up with instead of increasing the quality of the dataset. The old
+    version of C3POa can be found at https://github.com/rvolden/C3POa/tree/water.
 '''
 
 import os
@@ -67,8 +74,6 @@ def argParser():
                         default='R2C2_Consensus.fasta',
                         help='FASTA file that the consensus gets written to.\
                               Defaults to R2C2_Consensus.fasta.')
-    parser.add_argument('--zero', '-z', action='store_false', default=True,
-                        help='Use to exclude zero repeat reads. Defaults to True (includes zero repeats).')
     parser.add_argument('--timer', '-t', action='store_true', default=False,
                         help='Prints how long each dependency takes to run.\
                               Defaults to False.')

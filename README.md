@@ -1,6 +1,8 @@
 # C3POa
 C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.
 
+**This version of C3POa uses a new aligner (gonk). The old version of C3POa that uses water can be found [here](https://github.com/rvolden/C3POa/tree/water).**
+
 ### Dependencies ###
 - [Python 3.6](https://www.python.org/downloads/)
 - [NumPy 1.13.3](https://scipy.org/install.html)
