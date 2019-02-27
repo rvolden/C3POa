@@ -100,13 +100,11 @@ Options:
 python3 C3POa.py -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -s 1000 -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
 ```
 
-Timing things and excluding zero repeat reads:
+Timing things:
 ```bash
-python3 C3POa.py -t -z -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -s 1000 -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
+python3 C3POa.py -t -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -s 1000 -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
 ```
-When you include -t (--timer), water, poa, racon, and consensus.py will be timed (times are directed to stdout).
-
-When you include -z (--zero), C3POa will exclude zero repeat reads.
+When you include -t (--timer), gonk, poa, racon, and consensus.py will be timed (times are directed to stdout).
 
 Example output read (readName_averageQuality_originalReadLength_numberOfRepeats_subreadLength):
 ```
