@@ -52,7 +52,7 @@ Options (All required):
 
   -s  sequence of DNA splint used in R2C2 protocol in fasta format. Sequence name must contained the string 'Splint'
 
-  -c  config file containing path to BLAT binary ([example config](../blob/master/example_config))
+  -c  config file containing path to BLAT binary ([example config](example_config))
 ```
 
 ```bash
@@ -89,7 +89,7 @@ Options:
 
   -d  median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation. Defaults to 500
 
-  -c  config file containing paths to poa, racon, water, blat, and minimap2. ([example config](../blob/master/example_config))
+  -c  config file containing paths to poa, racon, water, blat, and minimap2. ([example config](example_config))
 
   -o  name (including path) of fasta file that the consensus gets written to. Defaults to R2C2_Consensus.fasta
 
