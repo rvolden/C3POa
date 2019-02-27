@@ -5,7 +5,7 @@
 
 poa	/bio-pipeline/poaV2/poa
 racon	/racon/bin/racon
-water	/EMBOSS-6.6.0/emboss/water
+gonk	/gonk/gonk
 minimap2	/minimap2/minimap2
 consensus	consensus.py
 racon	/racon/bin/racon
