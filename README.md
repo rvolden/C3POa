@@ -1,5 +1,5 @@
 # C3POa
-C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.**
+C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.
 
 ### Dependencies ###
 - [Python 3.6](https://www.python.org/downloads/)
