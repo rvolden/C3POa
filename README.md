@@ -1,5 +1,5 @@
 # C3POa
-C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.
+C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.**
 
 ### Dependencies ###
 - [Python 3.6](https://www.python.org/downloads/)
@@ -52,7 +52,7 @@ Options (All required):
 
   -s  sequence of DNA splint used in R2C2 protocol in fasta format. Sequence name must contained the string 'Splint'
 
-  -c  config file containing path to BLAT binary (format example: blat[tab]/path/to/blat)
+  -c  config file containing path to BLAT binary ([example config](../blob/master/config))
 ```
 
 ```bash
@@ -89,7 +89,7 @@ Options:
 
   -d  median distance between peaks cutoff. This should be the length of your shortest input sequence in your library preparation. Defaults to 500
 
-  -c  config file containing paths to poa, racon, water, blat, and minimap2. (format example poa[tab]/path/to/poa)
+  -c  config file containing paths to poa, racon, water, blat, and minimap2. ([example config](../blob/master/config))
 
   -o  name (including path) of fasta file that the consensus gets written to. Defaults to R2C2_Consensus.fasta
 
