@@ -327,6 +327,8 @@ def callPeaks(scoreList):
     # Add all of the smoothed peaks to list of all peaks
     sortedPeaks = sorted(list(set(peaks)))
 
+    if not sortedPeaks:
+        return [], -1
     finalPeaks = [sortedPeaks[0]]
     for i in range(1, len(sortedPeaks)):
         if sortedPeaks[i-1] < sortedPeaks[i] < sortedPeaks[i-1] + 100:
@@ -535,6 +537,8 @@ def analyze_reads(read_list):
             scoreList = split_SW(name, seed, seq)
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(scoreList)
+            if not peaks and median_distance == -1:
+                continue
 
             if figure:
                 makeFig(scoreList, peaks, seed, median_distance)
