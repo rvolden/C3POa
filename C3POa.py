@@ -360,11 +360,12 @@ def parse_file(scores):
 def runGonk(seq1, seq2):
     '''Runs gonk using the sequences given by split_SW'''
     go_start = time()
-    os.system('{0} -a seq1.fasta -b seq2.fasta -p 20 &>>gonk_messages'.format(gonk))
+    os.system('{0} -a seq1.fasta -b seq2.fasta -p 20 \
+              -o {1}/SW_PARSE.txt 2>./gonk_messages'.format(gonk, path))
     go_stop = time()
     if timer:
         print('gonk took ' + str(go_stop - go_start) + ' seconds to run.')
-    scores = 'SW_PARSE.txt'
+    scores = path + '/SW_PARSE.txt'
     scoreList = parse_file(scores)
     os.system('rm {0}'.format(scores))
     return scoreList
@@ -420,10 +421,11 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         pairwise = temp_folder + '/' + name + '_prelim_consensus.fasta'
         repeats = split_read(peaks, seq, out_F, qual, out_Fq, name)
 
-        PIR = temp_folder + '/' + name + 'alignment.fasta'
+        PIR = temp_folder + '/' + name + '_F.fasta'#'alignment.fasta'
+        # print('det cons', os.listdir('tmp1'))
         poa_start = time()
         os.system('%s -read_fasta %s -hb -pir %s \
-                  -do_progressive %s &>>poa_messages' \
+                  -do_progressive %s 2>./poa_messages' \
                   %(poa, out_F, PIR, score_matrix))
         poa_stop = time()
         if timer:
