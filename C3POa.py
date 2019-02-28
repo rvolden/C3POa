@@ -423,8 +423,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         pairwise = temp_folder + '/' + name + '_prelim_consensus.fasta'
         repeats = split_read(peaks, seq, out_F, qual, out_Fq, name)
 
-        PIR = temp_folder + '/' + name + '_F.fasta'#'alignment.fasta'
-        # print('det cons', os.listdir('tmp1'))
+        PIR = temp_folder + '/' + name + '_F.fasta'
         poa_start = time()
         os.system('%s -read_fasta %s -hb -pir %s \
                   -do_progressive %s 2>./poa_messages' \
