@@ -19,18 +19,12 @@ def argParser():
                         help='If you want to use a config file to specify paths to\
                               programs, specify them here. Use for poa, racon, water,\
                               blat, and minimap2 if they are not in your path.')
-    parser.add_argument('--zerorepeat', '-z', type=bool, action='store', default=True,\
-                        help="If you want to include zero repeat reads, you don't\
-                              have to do anything. If you want to exclude them, set\
-                              to False. See C3POa documentation for info on zero \
-                              repeat reads.")
     return vars(parser.parse_args())
 
 args = argParser()
 output_path = args['output_path'] + '/'
 input_file = args['input_fasta_file']
 adapter_file = args['adapter_file']
-zerorepeat = args['zerorepeat']
 
 def configReader(configIn):
     '''Parses the config file.'''
@@ -86,8 +80,6 @@ def read_fasta(inFile):
     sequences = sequences[1:]
     for i in range(len(headers)):
         repeat = headers[i].split('_')[-2]
-        if repeat == '0' and not zerorepeat:
-            continue
         readDict[headers[i]] = sequences[i]
     return readDict
 
