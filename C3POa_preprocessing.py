@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 10 Jan 2019
+# Last updated: 5 June 2018
 
 import os
 import sys
@@ -20,7 +20,7 @@ def argParser():
     parser.add_argument('--splint_file', '-s', type=str, action='store')
     parser.add_argument('--config', '-c', type=str, action='store', default='',
                         help='If you want to use a config file to specify paths to\
-                              programs, specify them here. Use for poa, racon, water,\
+                              programs, specify them here. Use for poa, racon, gonk,\
                               blat, and minimap2 if they are not in your path.')
     return vars(parser.parse_args())
 
@@ -39,9 +39,9 @@ def configReader(configIn):
             continue
         line = line.rstrip().split('\t')
         progs[line[0]] = line[1]
-    # should have minimap, poa, racon, water, consensus
+    # should have minimap, poa, racon, gonk, consensus
     # check for extra programs that shouldn't be there
-    possible = set(['poa', 'minimap2', 'water', 'consensus', 'racon', 'blat'])
+    possible = set(['poa', 'minimap2', 'gonk', 'consensus', 'racon', 'blat'])
     inConfig = set()
     for key in progs.keys():
         inConfig.add(key)
@@ -65,40 +65,42 @@ if args['config'] or args['c']:
 else:
     blat = 'blat'
 
-def read_and_filter_fastq(fastqFile):
-    '''
-    Takes a FASTQ file and returns dictionary of lists
-    readDict {'name_root':['full_header', seq, quality]...}
-    '''
-    readDict = {}
-    lineNum, lastPlus, lastHead, skip = 0, False, '', False
-    for line in open(fastqFile):
-        line = line.rstrip()
-        if not line:
-            continue
+def read_and_filter_fastq(input_file):
+    read_dict, read_iter = {}, {}
+    iterator, folder = 0, 0
+    for line in open(input_file):
+        iterator += 1
+        position = iterator % 4
+        read_iter[position] = line.strip()
+        if position == 0:
+            a = read_iter[1]
+            b = read_iter[2]
+            c = read_iter[3]
+            d = read_iter[0]
 
-        if lineNum % 4 == 0 and line[0] == '@':
-            name = line[1:].split()[0]
-            readDict[name], lastHead = [], name
+            average = 10
+            name = a[1:].split()[0]
+            sequence = b
+            qual = d
+            if len(sequence) >= read_length_cutoff and average >= quality_cutoff:
+                read_dict[name] = (sequence, qual)
+        if len(read_dict) == 10000:
+            folder += 1
+            process_reads(read_dict, folder)
+            read_dict = {}
+    folder += 1
+    process_reads(read_dict, folder)
 
-        if lineNum % 4 == 1:
-            readDict[lastHead].append(line)
-
-        if lineNum % 4 == 2:
-            lastPlus = True
-
-        if lineNum % 4 == 3 and lastPlus:
-            avgQ = sum([ord(x)-33 for x in line])/len(line)
-            sLen = len(readDict[lastHead][-1])
-            if avgQ >= quality_cutoff and sLen >= read_length_cutoff:
-                readDict[lastHead].append(line)
-                readDict[lastHead] = tuple(readDict[lastHead])
-            else:
-                del readDict[lastHead]
-            lastPlus, lastHead = False, ''
-
-        lineNum += 1
-    return readDict
+def process_reads(reads, folder):
+    path = output_path + str(folder)
+    os.system('rm -r ' + path)
+    os.system('mkdir ' + path)
+    print('Running BLAT to find splint locations (This can take hours)')
+    run_blat(path, reads)
+    print('Parsing BLAT output')
+    adapter_dict, adapter_set = parse_blat(path)
+    print('Writing fastq output files in bins of 4000 into separate folders')
+    write_fastq_files(path, adapter_dict, reads,adapter_set)
 
 def run_blat(path, reads):
     fasta_file = path + '/R2C2_temp_for_BLAT.fasta'
@@ -115,6 +117,7 @@ def parse_blat(path):
     alignment_file = path + '/Splint_to_read_alignments.psl'
     fasta_file = path + '/R2C2_temp_for_BLAT.fasta'
     adapter_dict = {}
+    adapter_set = set()
     length = 0
     for line in open(fasta_file):
         length += 1
@@ -127,8 +130,8 @@ def parse_blat(path):
         adapter_dict[name] = {}
         adapter_dict[name]['+'] = []
         adapter_dict[name]['-'] = []
-        adapter_dict[name]['+'].append(('-', 1, 0))
-        adapter_dict[name]['-'].append(('-', 1, len(sequence)))
+        adapter_dict[name]['+'].append(('-', 1, 0, 'o'))
+        adapter_dict[name]['-'].append(('-', 1, len(sequence), 'o'))
         iterator += 2
 
     burn_dict = {}
@@ -145,18 +148,25 @@ def parse_blat(path):
                 start = int(a[11]) - (int(a[14]) - int(a[16]))
                 end = int(a[12]) + int(a[15])
           position = min(max(0, int(start+((end-start)/2))), sequence_length-1)
-          adapter_dict[read_name][strand].append((adapter, float(a[0]), position))
-    return adapter_dict
+          adapter_dict[read_name][strand].append((adapter, float(a[0]), position, strand))
+          adapter_set.add(adapter)
+    return adapter_dict, adapter_set
 
-def write_fastq_files(path, adapter_dict, reads):
-    success = 0
-    os.system('mkdir ' + path + '/splint_reads')
+def write_fastq_files(path, adapter_dict, reads, adapter_set):
+    success_adapter = {}
+    for adapter in adapter_set:
+        os.system('mkdir ' + path + '/' + adapter)
+        success_adapter[adapter] = 0
     for read in reads:
         name, sequence, quality = read, reads[read][0], reads[read][1]
         adapter_plus = sorted(adapter_dict[name]['+'],
                               key=lambda x: x[1], reverse=True)
-        adapter_minus=sorted(adapter_dict[name]['-'],
+        adapter_minus = sorted(adapter_dict[name]['-'],
                              key=lambda x: x[1], reverse=True)
+
+        adapter_all = sorted(adapter_plus + adapter_minus,
+                             key=lambda x: x[1], reverse=True)
+        best_adapter_direction = adapter_all[0][3]
         plus_list_name, plus_list_position = [], []
         minus_list_name, minus_list_position = [], []
 
@@ -169,19 +179,25 @@ def write_fastq_files(path, adapter_dict, reads):
                 minus_list_name.append(adapter[0])
                 minus_list_position.append(adapter[2])
 
+        plus = False
         if len(plus_list_name) > 0 or len(minus_list_name) > 0:
-            success += 1
-            try:
-                out_fastq = open(path + '/splint_reads/'
-                                 + str(int(success/4000))
-                                 + '/R2C2_raw_reads' + '.fastq', 'a')
-            except:
-                os.system('mkdir ' + path + '/splint_reads/'
-                          + str(int(success/4000)))
-                out_fastq = open(path + '/splint_reads/'
-                                 + str(int(success/4000))
-                                 + '/R2C2_raw_reads' + '.fastq', 'w')
-            if len(plus_list_name) > 0:
+            if best_adapter_direction == '+':
+                plus = True
+            if plus:
+                adapter = plus_list_name[0]
+            else:
+                adapter = minus_list_name[0]
+
+            splint_reads_folder = adapter
+            success_adapter[adapter] += 1
+            success = success_adapter[adapter]
+
+            if not os.path.exists(path + '/' + splint_reads_folder
+                                  + '/R2C2_raw_reads.fastq'):
+                os.system('mkdir ' + path + '/' + splint_reads_folder)
+            out_fastq = open(path + '/' + splint_reads_folder + '/'
+                             + '/R2C2_raw_reads.fastq', 'a')
+            if plus:
                 out_fastq.write('@' + name + '_'
                                 + str(plus_list_position[0]) + '\n'
                                 + sequence + '\n+\n' + quality + '\n')
@@ -190,25 +206,13 @@ def write_fastq_files(path, adapter_dict, reads):
                                 + str(minus_list_position[0])
                                 + '\n' + sequence + '\n+\n' + quality + '\n')
         else:
-            try:
-                out_fastq = open(path + '/splint_reads/'
-                                 + '/No_splint_reads' + '.fastq', 'a')
-            except:
-                out_fastq = open(path + '/splint_reads/'
-                                 + '/No_splint_reads' + '.fastq', 'w')
-            out_fastq.write('>' + name
-                                + '\n' + sequence + '\n+\n' + quality + '\n')
-
+            out_fastq = open(path + '/No_splint_reads.fastq', 'a')
+            out_fastq.write('>' + name + '\n' + sequence
+                            + '\n+\n' + quality + '\n')
 
 def main():
-    print('Reading and filtering fastq file')
-    reads = read_and_filter_fastq(input_file)
-    print('Running BLAT to find splint locations (This can take hours)')
-    run_blat(output_path, reads)
-    print('Parsing BLAT output')
-    adapter_dict = parse_blat(output_path)
-    print('Writing fastq output files in bins of 4000 into separate folders')
-    write_fastq_files(output_path, adapter_dict, reads)
+        print('Reading and filtering the reads')
+        read_and_filter_fastq(input_file)
 
 if __name__ == '__main__':
     main()
