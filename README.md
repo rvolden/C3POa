@@ -49,7 +49,7 @@ After resolving all of the dependencies, you can run C3POa with python.
 
 ## C3POa_preprocessing.py
 
-Takes raw 1D nanopore R2C2 reads in fastq format, removes low quality and short reads and then finds splint sequences in those reads using BLAT. It then adds the position of the splint to the read name and generates separate folders each containing a fastq file containing 4000 raw reads.
+Takes raw 1D nanopore R2C2 reads in fastq format, removes low quality and short reads and then finds splint sequences in those reads using BLAT. It then adds the position of the splint to the read name and generates separate folders each containing a fastq file containing 4000 raw reads. Also demultiplexes reads based on splints that are put into the splint fasta file. You should end up with a directory that looks like: `somePath/number/Splint_1/R2C2_raw_reads.fastq` where Splint_1 would be which Splint that particular read was classified with.
 
 Options (All required):
 
