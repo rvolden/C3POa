@@ -47,9 +47,9 @@ def configReader(configIn):
             continue
         line = line.rstrip().split('\t')
         progs[line[0]] = line[1]
-    # should have minimap, poa, racon, water, consensus
+    # should have minimap, poa, racon, gonk, consensus
     # check for extra programs that shouldn't be there
-    possible = set(['poa', 'minimap2', 'water', 'consensus', 'racon', 'blat'])
+    possible = set(['poa', 'minimap2', 'gonk', 'consensus', 'racon', 'blat'])
     inConfig = set()
     for key in progs.keys():
         inConfig.add(key)
