@@ -119,7 +119,7 @@ Options:
 ```
 
 ```bash
-python3 C3POa.py -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -s 1000
+python3 C3POa.py -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -l 1000
                  -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
 ```
 
