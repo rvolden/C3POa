@@ -15,9 +15,9 @@ C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a*
 - [racon](https://github.com/isovic/racon)
 - [blat source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or [blat executable](http://hgdownload.soe.ucsc.edu/admin/exe/)
 
-To install dependencies, use setup.sh.<br>
+To fetch and build dependencies, use setup.sh.<br>
 setup.sh will download and make the packages that you need to run C3POa (except Python, NumPy, Go, and blat).<br>
-You don't need to have these in your PATH, but if you don't, you'll need to use a [config file](example_config).
+You don't need to have these in your PATH, but if you don't, you'll need to use a [config file](example_config). The setup script **does not** install programs or add them to your path. If you use the setup script, you still need to put the paths into a config file.
 
 ```bash
 chmod +x setup.sh
