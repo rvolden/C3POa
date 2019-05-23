@@ -108,7 +108,7 @@ Options:
   -d  median distance between peaks cutoff. This should be the length of your shortest
       input sequence in your library preparation. Defaults to 500
 
-  -c  config file containing paths to poa, racon, water, blat, and minimap2.
+  -c  config file containing paths to poa, racon, gonk, blat, and minimap2.
 
   -o  name (including path) of fasta file that the consensus gets written to. Defaults
       to R2C2_Consensus.fasta
