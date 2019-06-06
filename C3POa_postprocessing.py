@@ -85,7 +85,7 @@ def read_fasta(inFile):
             lastHead = line[1:]
         else:
             readDict[lastHead] += line
-    return readDict, len(readDict) * 2
+    return readDict
 
 def reverse_complement(sequence):
     '''Returns the reverse complement of a sequence'''
@@ -98,21 +98,16 @@ def run_blat(path, infile, adapter_fasta):
               %s %s %s/Adapter_to_consensus_alignment.psl' \
               %(blat,adapter_fasta,infile,path))
 
-def parse_blat(path, infile, length):
+def parse_blat(path, reads):
     adapter_dict, iterator = {}, 0
-    infile1 = open(infile, 'r')
-    print(length)
-    while iterator < length:
-        line = infile1.readline()
-        sequence = infile1.readline()
 
-        name = line[1:].strip()
+    for name,sequence in reads.items():
+
         adapter_dict[name] = {}
         adapter_dict[name]['+'] = []
         adapter_dict[name]['-'] = []
         adapter_dict[name]['+'].append(('-', 1, 0))
         adapter_dict[name]['-'].append(('-', 1, len(sequence)))
-        iterator += 2
 
     for line in open(path + '/Adapter_to_consensus_alignment.psl'):
         a = line.strip().split('\t')
@@ -184,10 +179,10 @@ def write_fasta_file(path, adapter_dict, reads):
                         out5.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
 
 def main():
-    reads, fileLen = read_fasta(input_file)
+    reads = read_fasta(input_file)
 
     run_blat(output_path, input_file, adapter_file)
-    adapter_dict = parse_blat(output_path, input_file, fileLen)
+    adapter_dict = parse_blat(output_path, reads)
     write_fasta_file(output_path, adapter_dict, reads)
 
 if __name__ == '__main__':
