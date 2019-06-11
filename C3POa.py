@@ -1,6 +1,7 @@
+
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 27 Feb 2019
+# Last updated: 11 Jun 2019
 
 '''
 Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
@@ -36,6 +37,10 @@ Dependencies:
     reads. This is because zero repeat reads only increase the number of reads
     you end up with instead of increasing the quality of the dataset. The old
     version of C3POa can be found at https://github.com/rvolden/C3POa/tree/water.
+
+06/11/2019 Release note:
+    I've added back in support for zero repeat reads. It can still be toggled off
+    by using the -z or --zero options.
 '''
 
 import os
@@ -74,6 +79,8 @@ def argParser():
                         default='R2C2_Consensus.fasta',
                         help='FASTA file that the consensus gets written to.\
                               Defaults to R2C2_Consensus.fasta.')
+    parser.add_argument('--zero', '-z', action='store_false', default=True,
+                        help='Use to exclude zero repeat reads. Defaults to True (includes zero repeats).')
     parser.add_argument('--timer', '-t', action='store_true', default=False,
                         help='Prints how long each dependency takes to run.\
                               Defaults to False.')
@@ -123,7 +130,7 @@ else:
 
 consensus = 'python3 ' + consensus
 path = args['path'] + '/'
-temp_folder = path + '/' + 'tmp1'
+temp_folder = path + '/tmp1'
 input_file = args['reads']
 score_matrix = args['matrix']
 
@@ -131,20 +138,24 @@ seqLenCutoff = args['slencutoff']
 medDistCutoff = args['mdistcutoff']
 
 out_file = args['output']
+zero_repeat = args['zero']
 timer = args['timer']
 figure = args['figure']
+
 subread_file = 'subreads.fastq'
 os.chdir(path)
 sub = open(path + '/' + subread_file, 'w')
-os.system('rm -r ' + temp_folder)
+if os.path.exists(temp_folder):
+    os.system('rm -r ' + temp_folder)
 os.system('mkdir ' + temp_folder)
+good, bad, zero = [0], [0], [0]
 
 def revComp(sequence):
     '''Returns the reverse complement of a sequence'''
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
     return ''.join([bases[x] for x in list(sequence)])[::-1]
 
-def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
+def split_read(split_list, sequence, out_file1, qual, out_file1q, name,median_distance):
     '''
     split_list : list, peak positions
     sequence : str
@@ -158,10 +169,13 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
     '''
     out_F = open(out_file1, 'w')
     out_Fq = open(out_file1q, 'w')
+    lengths = []
     for i in range(len(split_list) - 1):
         split1 = split_list[i]
         split2 = split_list[i+1]
-        if len(sequence[split1:split2]) > 30:
+        if len(sequence[split1:split2]) > 30 and \
+           median_distance*0.8 < len(sequence[split1:split2]) < median_distance*1.2:
+            lengths.append(len(sequence[split1:split2]))
             out_F.write('>' + str(i + 1) + '\n' \
                         + sequence[split1:split2] + '\n')
             out_Fq.write('@' + str(i + 1) + '\n' \
@@ -189,7 +203,7 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name):
     repeats = str(int(i + 1))
     out_F.close()
     out_Fq.close()
-    return repeats
+    return repeats, lengths
 
 def read_fasta(inFile):
     '''Reads in FASTA files, returns a dict of header:sequence'''
@@ -404,6 +418,21 @@ def split_SW(name, seed, seq):
         scoreList = scoreList[::-1]
     return scoreList
 
+def extract_overlap(overlap_paf, fastq_dict):
+    overlap = {}
+    for line in open(overlap_paf):
+        line = line.strip().split('\t')
+        name1, start1, end1 = line[0], int(line[2]), int(line[3])
+        name2, start2, end2 = line[5], int(line[7]), int(line[8])
+        if name1 != name2:
+            left = fastq_dict[name1][0][:start1]
+            right = fastq_dict[name2][0][end2:]
+            # put the sequence and quality chunks into the overlap dictionary
+            overlap[name1] = [fastq_dict[name1][0][start1:end1], fastq_dict[name1][1][start1:end1]]
+            overlap[name2] = [fastq_dict[name2][0][start2:end2], fastq_dict[name2][1][start2:end2]]
+            return left, overlap, right
+    return '', {}, ''
+
 def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     '''
     Aligns and returns the consensus depending on the number of repeats
@@ -414,14 +443,67 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     '''
     repeats = ''
     corrected_consensus = ''
-    if median_distance > medDistCutoff and len(peaks) >= 1:
-        out_F = temp_folder + '/' + name + '_F.fasta'
-        out_Fq = temp_folder + '/' + name + '_F.fastq'
-        poa_cons = temp_folder + '/' + name + '_consensus.fasta'
+    out_F = temp_folder + '/' + name + '_F.fasta'
+    out_Fq = temp_folder + '/' + name + '_F.fastq'
+    poa_cons = temp_folder + '/' + name + '_consensus.fasta'
+    pairwise = temp_folder + '/' + name + '_prelim_consensus.fasta'
+
+    if len(peaks) == 1 and zero_repeat:
+        zero[0] += 1
+        seed = peaks[0]
+        seq1, qual1 = seq[seed:], qual[seed:]
+        seq2, qual2 = seq[:seed], qual[:seed]
+
+        overlap_paf = temp_folder +'/' + name + '_overlaps.paf'
+        PIR = temp_folder + '/' + name + '_F_poa.fasta'
+        overlap_fasta = temp_folder +'/' + name + '_overlaps.fasta'
+        overlap_fastq = temp_folder +'/' + name + '_overlaps.fastq'
+
+        fasta = open(out_F, 'w')
+        fastq_dict = {}
+        fastq_dict[name + '_1'] = [seq1, qual1]
+        fastq_dict[name + '_2'] = [seq2, qual2]
+
+        fasta.write('>' + name + '_1\n' + seq1 + '\n')
+        fasta.write('>' + name + '_2\n' + seq2 + '\n')
+        fasta.close()
+
+        os.system('%s -x ava-ont %s %s > %s \
+                  2> ./minimap2_messages' \
+                  %(minimap2, out_F, out_F, overlap_paf))
+
+        left, overlap, right = extract_overlap(overlap_paf, fastq_dict)
+        if overlap:
+            o_fasta = open(overlap_fasta, 'w')
+            o_fastq = open(overlap_fastq, 'w')
+
+            for read in overlap:
+                o_fasta.write('>' + read + '\n' + overlap[read][0] + '\n')
+                o_fastq.write('@' + read + '\n' + overlap[read][0] + '\n+\n' + overlap[read][1] + '\n')
+            o_fasta.close()
+            o_fastq.close()
+            os.system('%s -read_fasta %s -hb -pir %s \
+                      -do_progressive %s 2>./poa_messages' \
+                      %(poa, overlap_fasta, PIR, score_matrix))
+
+            reads = read_fasta(PIR)
+            Qual_Fasta = open(pairwise, 'w')
+            for read in reads:
+                if 'CONSENS' not in read:
+                    Qual_Fasta.write('>' + read + '\n' + reads[read] + '\n')
+            Qual_Fasta.close()
+            os.system('%s %s %s %s >> %s' \
+                      %(consensus, pairwise, overlap_fastq, name, poa_cons))
+            reads = read_fasta(poa_cons)
+            for read in reads:
+                corrected_consensus = left + reads[read] + right
+            repeats = 0
+
+    elif median_distance > medDistCutoff and len(peaks) >= 1:
+        good[0] += 1
         final = temp_folder + '/' + name + '_corrected_consensus.fasta'
         overlap = temp_folder +'/' + name + '_overlaps.sam'
-        pairwise = temp_folder + '/' + name + '_prelim_consensus.fasta'
-        repeats = split_read(peaks, seq, out_F, qual, out_Fq, name)
+        repeats, lengths = split_read(peaks, seq, out_F, qual, out_Fq, name, median_distance)
 
         PIR = temp_folder + '/' + name + '_F.fasta'
         poa_start = time()
@@ -433,7 +515,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
             print('POA took ' + str(poa_stop - poa_start) + ' seconds to run.')
         reads = read_fasta(PIR)
 
-        if repeats == '2':
+        if len(lengths) == 2:
             Qual_Fasta = open(pairwise, 'w')
             for read in reads:
                 if 'CONSENS' not in read:
@@ -479,6 +561,9 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         reads = read_fasta(final)
         for read in reads:
             corrected_consensus = reads[read]
+    else:
+        bad[0] += 1
+
     return corrected_consensus, repeats
 
 def read_fastq_file(seq_file):
@@ -534,6 +619,7 @@ def analyze_reads(read_list):
         if seqLenCutoff < seq_length:
             final_consensus = ''
             scoreList = split_SW(name, seed, seq)
+
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(scoreList)
             if not peaks and median_distance == -1:
@@ -560,9 +646,15 @@ def main():
     '''Controls the flow of the program'''
     final_out = open(out_file, 'w')
     final_out.close()
+
     print(input_file)
     read_list = read_fastq_file(input_file)
+
     analyze_reads(read_list)
+    total = good[0] + bad[0] + zero[0]
+    sys.stderr.write("Consensus reads: {0}\t({1:.2f}%)\n".format(good[0], good[0]/total*100))
+    sys.stderr.write("Zero repeat reads: {0}\t({1:.2f}%)\n".format(zero[0], zero[0]/total*100))
+    sys.stderr.write("Non-consensus reads: {0}\t({1:.2f}%)\n".format(bad[0], bad[0]/total*100))
 
 if __name__ == '__main__':
     main()
