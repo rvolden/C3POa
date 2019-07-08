@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
 # Last updated: 5 June 2018
@@ -93,8 +94,10 @@ def read_and_filter_fastq(input_file):
 
 def process_reads(reads, folder):
     path = output_path + str(folder)
-    os.system('rm -r ' + path)
-    os.system('mkdir ' + path)
+    if os.path.exists(path):
+        os.system('rm -r ' + path)
+    if not os.path.exists(path):
+        os.system('mkdir ' + path)
     print('Running BLAT to find splint locations (This can take hours)')
     run_blat(path, reads)
     print('Parsing BLAT output')
