@@ -158,7 +158,8 @@ def parse_blat(path):
 def write_fastq_files(path, adapter_dict, reads, adapter_set):
     success_adapter = {}
     for adapter in adapter_set:
-        os.system('mkdir ' + path + '/' + adapter)
+        if not os.path.exists(path + '/' + adapter):
+            os.system('mkdir ' + path + '/' + adapter)
         success_adapter[adapter] = 0
     for read in reads:
         name, sequence, quality = read, reads[read][0], reads[read][1]
