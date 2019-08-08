@@ -196,8 +196,7 @@ def write_fastq_files(path, adapter_dict, reads, adapter_set):
             success_adapter[adapter] += 1
             success = success_adapter[adapter]
 
-            if not os.path.exists(path + '/' + splint_reads_folder
-                                  + '/R2C2_raw_reads.fastq'):
+            if not os.path.exists(path + '/' + splint_reads_folder):
                 os.system('mkdir ' + path + '/' + splint_reads_folder)
             out_fastq = open(path + '/' + splint_reads_folder + '/'
                              + '/R2C2_raw_reads.fastq', 'a')
@@ -211,7 +210,7 @@ def write_fastq_files(path, adapter_dict, reads, adapter_set):
                                 + '\n' + sequence + '\n+\n' + quality + '\n')
         else:
             out_fastq = open(path + '/No_splint_reads.fastq', 'a')
-            out_fastq.write('>' + name + '\n' + sequence
+            out_fastq.write('@' + name + '\n' + sequence
                             + '\n+\n' + quality + '\n')
 
 def main():
