@@ -53,8 +53,8 @@ def configReader(configIn):
     inConfig = set()
     for key in progs.keys():
         inConfig.add(key)
-        if key not in possible:
-            raise Exception('Check config file')
+        # if key not in possible:
+        #     raise Exception('Check config file')
     # check for missing programs
     # if missing, default to path
     for missing in possible-inConfig:
