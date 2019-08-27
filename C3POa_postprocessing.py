@@ -82,17 +82,18 @@ def read_fasta(inFile):
             continue
         if line.startswith('>'):
             if readDict:
-                ''.join(readDict[lastHead])
+                readDict[lastHead] = ''.join(readDict[lastHead])
             readDict[line[1:]] = []
             lastHead = line[1:]
         else:
             readDict[lastHead].append(line)
-    ''.join(readDict[lastHead])
+    readDict[lastHead] = ''.join(readDict[lastHead])
     return readDict
 
 def reverse_complement(sequence):
     '''Returns the reverse complement of a sequence'''
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
+    print(sequence)
     return ''.join([bases[x] for x in list(sequence)])[::-1]
 
 def run_blat(path, infile, adapter_fasta):
@@ -134,6 +135,8 @@ def write_fasta_file(path, adapter_dict, reads):
     out3 = open(path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
     out5 = open(path + 'R2C2_full_length_consensus_reads_right_splint.fasta', 'w')
     for name, sequence in reads.items():
+        if type(sequence) == list:
+            sequence = ''.join(sequence)
         adapter_plus = sorted(adapter_dict[name]['+'],
                               key=lambda x: x[2], reverse=False)
         adapter_minus = sorted(adapter_dict[name]['-'],
