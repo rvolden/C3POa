@@ -153,7 +153,7 @@ def write_fasta_file(path, adapter_dict, reads):
         if len(plus_list_name) == 1 and len(minus_list_name) == 1:
             if plus_list_position[0] < minus_list_position[0]:
                 seq = sequence[plus_list_position[0]:minus_list_position[0]]
-                ada = sequence[plus_list_position[0]-40:minus_list_position[0]+40]
+                ada = sequence[max(plus_list_position[0]-40, 0):minus_list_position[0]+40]
                 name += '_' + str(len(seq))
                 use = False
                 if undirectional:
