@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 5 June 2018
+# Last updated: 26 March 2020 by Roger Volden
 
 import os
 import sys
@@ -22,14 +22,14 @@ def argParser():
                         help='If you want to use a config file to specify paths to\
                               programs, specify them here. Use for poa, racon, gonk,\
                               blat, and minimap2 if they are not in your path.')
-    return vars(parser.parse_args())
+    return parser.parse_args()
 
 args = argParser()
-output_path = args['output_path'] + '/'
-input_file = args['input_fastq_file']
-quality_cutoff = args['quality_cutoff']
-read_length_cutoff = args['read_length_cutoff']
-splint_file = args['splint_file']
+output_path = args.output_path + '/'
+input_file = args.input_fastq_file
+quality_cutoff = args.quality_cutoff
+read_length_cutoff = args.read_length_cutoff
+splint_file = args.splint_file
 
 def configReader(configIn):
     '''Parses the config file.'''
@@ -59,50 +59,41 @@ def configReader(configIn):
                          + ' from your path, not the config file.\n')
     return progs
 
-if args['config'] or args['c']:
-    progs = configReader(args['config'])
+if args.config:
+    progs = configReader(args.config)
     blat = progs['blat']
 else:
     blat = 'blat'
 
 def read_and_filter_fastq(input_file):
     read_dict, read_iter = {}, {}
-    iterator, folder = 0, 0
+    iterator = 0
     for line in open(input_file):
         iterator += 1
         position = iterator % 4
         read_iter[position] = line.strip()
         if position == 0:
-            a = read_iter[1]
-            b = read_iter[2]
+            name = read_iter[1][1:].split()[0]
+            sequence = read_iter[2]
             c = read_iter[3]
-            d = read_iter[0]
+            qual = read_iter[0]
 
-            average = 10
-            name = a[1:].split()[0]
-            sequence = b
-            qual = d
+            average = sum([ord(x)-33 for x in qual])/len(qual)
             if len(sequence) >= read_length_cutoff and average >= quality_cutoff:
                 read_dict[name] = (sequence, qual)
         if len(read_dict) == 10000:
-            folder += 1
-            process_reads(read_dict, folder)
+            process_reads(read_dict)
             read_dict = {}
-    folder += 1
-    process_reads(read_dict, folder)
+    process_reads(read_dict)
 
-def process_reads(reads, folder):
-    path = output_path + str(folder)
-    if os.path.exists(path):
-        os.system('rm -r ' + path)
-    if not os.path.exists(path):
-        os.system('mkdir ' + path)
-    print('Running BLAT to find splint locations (This can take hours)')
+def process_reads(reads):
+    path = output_path
+    print('Running BLAT to find splint locations')
     run_blat(path, reads)
     print('Parsing BLAT output')
     adapter_dict, adapter_set = parse_blat(path)
-    print('Writing fastq output files in bins of 4000 into separate folders')
-    write_fastq_files(path, adapter_dict, reads,adapter_set)
+    print('Writing fastq output files')
+    write_fastq_files(path, adapter_dict, reads, adapter_set)
 
 def run_blat(path, reads):
     fasta_file = path + '/R2C2_temp_for_BLAT.fasta'

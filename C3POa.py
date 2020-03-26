@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 11 Jun 2019
+# Last updated: 26 March 2020 by Roger Volden
 
 '''
 Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
@@ -40,6 +40,13 @@ Dependencies:
 06/11/2019 Release note:
     I've added back in support for zero repeat reads. It can still be toggled off
     by using the -z or --zero options.
+
+03/26/2020 Release note:
+    Added in native multiprocessing support. There are two extra options pertaining
+    to mp: numThreads and groupSize. numThreads determines the number of threads
+    to consensus call on (defaults to 1). groupSize determines the number of reads
+    that each thread will process at a time. Reads are chunked and assigned a thread
+    in a threadpool. The default number of reads per group is 1000.
 '''
 
 import os
@@ -47,6 +54,7 @@ import sys
 import numpy as np
 import argparse
 from time import time
+import multiprocessing as mp
 
 def argParser():
     '''Parses arguments.'''
@@ -74,10 +82,6 @@ def argParser():
     parser.add_argument('--mdistcutoff', '-d', type=int, action='store', default=500,
                         help='Sets the median distance cutoff for consensus sequences.\
                               Anything shorter will be excluded. Defaults to 500.')
-    parser.add_argument('--output', '-o', type=str, action='store',
-                        default='R2C2_Consensus.fasta',
-                        help='FASTA file that the consensus gets written to.\
-                              Defaults to R2C2_Consensus.fasta.')
     parser.add_argument('--zero', '-z', action='store_false', default=True,
                         help='Use to exclude zero repeat reads. Defaults to True (includes zero repeats).')
     parser.add_argument('--timer', '-t', action='store_true', default=False,
@@ -85,7 +89,14 @@ def argParser():
                               Defaults to False.')
     parser.add_argument('--figure', '-f', action='store_true', default=False,
                         help='Use if you want to output a histogram of scores.')
-    return vars(parser.parse_args())
+    parser.add_argument('--numThreads', '-n', type=int, default=1,
+                        help='Number of threads to use during multiprocessing.')
+    parser.add_argument('--groupSize', '-g', type=int, default=1000,
+                        help='Number of reads processed by each thread in each iteration.')
+    parser.add_argument('--sample', '-s', type=str, action='store', default='R2C2',
+                        help='Name of sample in snake or camel case.')
+
+    return parser.parse_args()
 
 def configReader(configIn):
     '''Parses the config file.'''
@@ -116,8 +127,8 @@ def configReader(configIn):
     return progs
 
 args = argParser()
-if args['config']:
-    progs = configReader(args['config'])
+if args.config:
+    progs = configReader(args.config)
     minimap2 = progs['minimap2']
     poa = progs['poa']
     racon = progs['racon']
@@ -128,25 +139,22 @@ else:
     consensus = 'consensus.py'
 
 consensus = 'python3 ' + consensus
-path = args['path'] + '/'
-temp_folder = path + '/tmp1'
-input_file = args['reads']
-score_matrix = args['matrix']
+path = args.path + '/'
 
-seqLenCutoff = args['slencutoff']
-medDistCutoff = args['mdistcutoff']
+input_file = args.reads
+score_matrix = args.matrix
 
-out_file = args['output']
-zero_repeat = args['zero']
-timer = args['timer']
-figure = args['figure']
+numThreads = args.numThreads
+sample = args.sample
+groupSize = args.groupSize
 
-subread_file = 'subreads.fastq'
-os.chdir(path)
-sub = open(path + '/' + subread_file, 'w')
-if os.path.exists(temp_folder):
-    os.system('rm -r ' + temp_folder)
-os.system('mkdir ' + temp_folder)
+seqLenCutoff = args.slencutoff
+medDistCutoff = args.mdistcutoff
+
+zero_repeat = args.zero
+timer = args.timer
+figure = args.figure
+
 good, bad, zero = [0], [0], [0]
 
 def revComp(sequence):
@@ -154,7 +162,7 @@ def revComp(sequence):
     bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
     return ''.join([bases[x] for x in list(sequence)])[::-1]
 
-def split_read(split_list, sequence, out_file1, qual, out_file1q, name,median_distance):
+def split_read(split_list, sequence, out_file1, qual, out_file1q, name,median_distance,sub):
     '''
     split_list : list, peak positions
     sequence : str
@@ -173,7 +181,7 @@ def split_read(split_list, sequence, out_file1, qual, out_file1q, name,median_di
         split1 = split_list[i]
         split2 = split_list[i+1]
         if len(sequence[split1:split2]) > 30 and \
-           median_distance*0.8 < len(sequence[split1:split2]) < median_distance*1.2:
+                median_distance*0.8 < len(sequence[split1:split2]) < median_distance*1.2:
             lengths.append(len(sequence[split1:split2]))
             out_F.write('>' + str(i + 1) + '\n' \
                         + sequence[split1:split2] + '\n')
@@ -376,20 +384,20 @@ def parse_file(scores):
         scoreList.append(value)
     return scoreList
 
-def runGonk(seq1, seq2):
+def runGonk(seq1, seq2, sub_folder):
     '''Runs gonk using the sequences given by split_SW'''
     go_start = time()
     os.system('{0} -a seq1.fasta -b seq2.fasta -p 20 \
-              -o {1}/SW_PARSE.txt 2>./gonk_messages'.format(gonk, path))
+              -o {1}/SW_PARSE.txt 2>./gonk_messages'.format(gonk, sub_folder))
     go_stop = time()
     if timer:
         print('gonk took ' + str(go_stop - go_start) + ' seconds to run.')
-    scores = path + '/SW_PARSE.txt'
+    scores = sub_folder + '/SW_PARSE.txt'
     scoreList = parse_file(scores)
     os.system('rm {0}'.format(scores))
     return scoreList
 
-def split_SW(name, seed, seq):
+def split_SW(name, seed, seq, sub_folder):
     '''
     Takes a sequence and does the gonk alignment to itself
     Returns a list of scores from summing diagonals from the
@@ -416,7 +424,7 @@ def split_SW(name, seed, seq):
         align_file2.write(seq[i:i+5000] + '\n')
     align_file2.close()
 
-    scoreList = runGonk(seq1, seq)
+    scoreList = runGonk(seq1, seq, sub_folder)
     if reverse:
         scoreList = scoreList[::-1]
     return scoreList
@@ -436,7 +444,7 @@ def extract_overlap(overlap_paf, fastq_dict):
             return left, overlap, right
     return '', {}, ''
 
-def determine_consensus(name, seq, peaks, qual, median_distance, seed):
+def determine_consensus(name, seq, peaks, qual, median_distance, seed, temp_folder, sub):
     '''
     Aligns and returns the consensus depending on the number of repeats
     If there are multiple peaks, it'll do the normal partial order
@@ -457,7 +465,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         seq1, qual1 = seq[seed:], qual[seed:]
         seq2, qual2 = seq[:seed], qual[:seed]
 
-        overlap_paf = temp_folder +'/' + name + '_overlaps.paf'
+        overlap_paf = temp_folder + '/' + name + '_overlaps.paf'
         PIR = temp_folder + '/' + name + '_F_poa.fasta'
         overlap_fasta = temp_folder +'/' + name + '_overlaps.fasta'
         overlap_fastq = temp_folder +'/' + name + '_overlaps.fastq'
@@ -470,7 +478,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
         fasta.write('>' + name + '_1\n' + seq1 + '\n')
         fasta.write('>' + name + '_2\n' + seq2 + '\n')
         fasta.close()
-
+        os.system('pwd')
         os.system('%s -x ava-ont %s %s > %s \
                   2> ./minimap2_messages' \
                   %(minimap2, out_F, out_F, overlap_paf))
@@ -505,8 +513,8 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed):
     elif median_distance > medDistCutoff and len(peaks) >= 1:
         good[0] += 1
         final = temp_folder + '/' + name + '_corrected_consensus.fasta'
-        overlap = temp_folder +'/' + name + '_overlaps.sam'
-        repeats, lengths = split_read(peaks, seq, out_F, qual, out_Fq, name, median_distance)
+        overlap = temp_folder + '/' + name + '_overlaps.sam'
+        repeats, lengths = split_read(peaks, seq, out_F, qual, out_Fq, name, median_distance, sub)
 
         PIR = temp_folder + '/' + name + '_F.fasta'
         poa_start = time()
@@ -581,7 +589,6 @@ def read_fastq_file(seq_file):
         seq_length : int, length of the sequence
     '''
     read_list, lineNum = [], 0
-    lastPlus = False
     for line in open(seq_file):
         line = line.rstrip()
         if not line:
@@ -589,7 +596,11 @@ def read_fastq_file(seq_file):
         # make an entry as a list and append the header to that list
         if lineNum % 4 == 0 and line[0] == '@':
             splitLine = line[1:].split('_')
-            root, seed = splitLine[0], int(splitLine[1])
+            # Kayla: edited to handle hairpin split reads with pre and post
+            if len(splitLine) == 2:
+                root, seed = splitLine[0], int(splitLine[1])
+            else:
+                root, seed = splitLine[0]+'_'+splitLine[1], int(splitLine[2])
             read_list.append([])
             read_list[-1].append(root)
             read_list[-1].append(seed)
@@ -609,19 +620,38 @@ def read_fastq_file(seq_file):
             read_list[-1].append(avgQ)
             read_list[-1].append(len(read_list[-1][2]))
             read_list[-1] = tuple(read_list[-1])
+            lastPlus = False
 
         lineNum += 1
+
     return read_list
 
-def analyze_reads(read_list):
+def analyze_reads(read_list, iteration):
     '''
     Takes reads that are longer than 1000 bases and gives the consensus.
     Writes to R2C2_Consensus.fasta
     '''
+    print(iteration)
+    sub_folder = path + '/tmp' + str(iteration)
+    os.system('rm -r %s' %(sub_folder))
+    os.system('mkdir %s' %(sub_folder))
+    final_out = open(sub_folder + '/R2C2_Consensus.fasta', 'w')
+    final_out.close()
+    subread_file = 'subreads.fastq'
+    if not os.path.isdir(sub_folder):
+        exit()
+    os.chdir(sub_folder)
+
+    sub = open(sub_folder + '/' + subread_file, 'w')
+    temp_folder = sub_folder + '/tmp'
+    if os.path.exists(temp_folder):
+        os.system('rm -r ' + temp_folder)
+    os.system('mkdir ' + temp_folder)
+
     for name, seed, seq, qual, average_quals, seq_length in read_list:
         if seqLenCutoff < seq_length:
             final_consensus = ''
-            scoreList = split_SW(name, seed, seq)
+            scoreList = split_SW(name, seed, seq, sub_folder)
 
             # calculate where peaks are and the median distance between them
             peaks, median_distance = callPeaks(scoreList)
@@ -634,26 +664,41 @@ def analyze_reads(read_list):
             # make the consensus
             final_consensus, repeats = determine_consensus(name, seq, peaks,
                                                            qual, median_distance,
-                                                           seed)
+                                                           seed, temp_folder, sub)
             if final_consensus:
-                final_out = open(out_file, 'a')
+                final_out = open(sub_folder + '/R2C2_Consensus.fasta', 'a')
                 final_out.write('>' + name + '_' \
                                 + str(round(average_quals, 2)) + '_' \
                                 + str(seq_length) + '_' + str(repeats) \
                                 + '_' + str(len(final_consensus)))
                 final_out.write('\n' + final_consensus + '\n')
                 final_out.close()
-                os.system('rm ' + temp_folder + '/*')
+                os.system('rm -r ' + temp_folder + '/*')
 
 def main():
     '''Controls the flow of the program'''
-    final_out = open(out_file, 'w')
-    final_out.close()
-
     print(input_file)
-    read_list = read_fastq_file(input_file)
 
-    analyze_reads(read_list)
+    pool = mp.Pool(processes=numThreads)
+    read_list = read_fastq_file(input_file)
+    iteration = 1
+    for step in range(0, len(read_list), groupSize):
+        interval1 = step
+        interval2 = min(len(read_list), step+groupSize)
+        pool.apply_async(analyze_reads, [read_list[interval1:interval2], iteration])
+        iteration += 1
+    pool.close()
+    pool.join()
+
+    final_fasta = path + '/' + sample + '_Consensus.fasta'
+    final_subreads = path + '/' + sample + '_Subreads.fastq'
+    for i in range(1, iteration):
+        sub_folder = path + '/tmp' + str(i)
+        sub_fasta = sub_folder + '/R2C2_Consensus.fasta'
+        sub_subreads = sub_folder + '/subreads.fastq'
+        os.system('cat %s >>%s' %(sub_fasta, final_fasta))
+        os.system('cat %s >>%s' %(sub_subreads, final_subreads))
+
     total = good[0] + bad[0] + zero[0]
     sys.stderr.write("Consensus reads: {0}\t({1:.2f}%)\n".format(good[0], good[0]/total*100))
     sys.stderr.write("Zero repeat reads: {0}\t({1:.2f}%)\n".format(zero[0], zero[0]/total*100))
