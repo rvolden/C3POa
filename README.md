@@ -103,7 +103,8 @@ C3POa now natively supports multiprocessing.
 Options:
 
 ```
-  -p  directory to which all temporary files will be written. Defaults to your current directory.
+  -p  directory to which all temporary files will be written. Also where your final consensus
+      file will end up. Defaults to your current directory
 
   -m  path to NUC.4.4.mat file (included in repository)
 
@@ -112,10 +113,7 @@ Options:
   -d  median distance between peaks cutoff. This should be the length of your shortest
       input sequence in your library preparation. Defaults to 500
 
-  -c  config file containing paths to poa, racon, gonk, blat, and minimap2.
-
-  -o  name (including path) of fasta file that the consensus gets written to. Defaults
-      to R2C2_Consensus.fasta
+  -c  config file containing paths to poa, racon, gonk, blat, and minimap2
 
   -z  use to exclude zero repeat reads
 
@@ -125,7 +123,9 @@ Options:
 
   -n  the number of threads to use in multiprocessing. Defaults to 1
 
-  -g the number of reads processed by each thread. Defaults to 1000
+  -g  the number of reads processed by each thread. Defaults to 1000
+
+  -s  the name of the sample. Defaults to R2C2
 ```
 
 ```bash
