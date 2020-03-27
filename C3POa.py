@@ -631,7 +631,7 @@ def analyze_reads(read_list, iteration):
     Takes reads that are longer than 1000 bases and gives the consensus.
     Writes to R2C2_Consensus.fasta
     '''
-    print(iteration)
+    # print(iteration)
     sub_folder = path + '/tmp' + str(iteration)
     os.system('rm -r %s' %(sub_folder))
     os.system('mkdir %s' %(sub_folder))
