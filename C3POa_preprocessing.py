@@ -134,15 +134,15 @@ def parse_blat(path):
         gaps, score = float(a[5]), float(a[0])
         sequence_length = int(a[10])
         if gaps < 50 and score > 50: # Looks for unspliced quality alignment
-          if strand == '+':
+            if strand == '+':
                 start = int(a[11]) - int(a[15])
                 end = int(a[12]) + int(a[14]) - int(a[16])
-          if strand == '-':
+            if strand == '-':
                 start = int(a[11]) - (int(a[14]) - int(a[16]))
                 end = int(a[12]) + int(a[15])
-          position = min(max(0, int(start+((end-start)/2))), sequence_length-1)
-          adapter_dict[read_name][strand].append((adapter, float(a[0]), position, strand))
-          adapter_set.add(adapter)
+            position = min(max(0, int(start+((end-start)/2))), sequence_length-1)
+            adapter_dict[read_name][strand].append((adapter, float(a[0]), position, strand))
+            adapter_set.add(adapter)
     return adapter_dict, adapter_set
 
 def write_fastq_files(path, adapter_dict, reads, adapter_set):
