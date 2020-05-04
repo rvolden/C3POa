@@ -699,10 +699,10 @@ def main():
         os.system('cat %s >>%s' %(sub_fasta, final_fasta))
         os.system('cat %s >>%s' %(sub_subreads, final_subreads))
 
-    total = good[0] + bad[0] + zero[0]
-    sys.stderr.write("Consensus reads: {0}\t({1:.2f}%)\n".format(good[0], good[0]/total*100))
-    sys.stderr.write("Zero repeat reads: {0}\t({1:.2f}%)\n".format(zero[0], zero[0]/total*100))
-    sys.stderr.write("Non-consensus reads: {0}\t({1:.2f}%)\n".format(bad[0], bad[0]/total*100))
+    # total = good[0] + bad[0] + zero[0]
+    # sys.stderr.write("Consensus reads: {0}\t({1:.2f}%)\n".format(good[0], good[0]/total*100))
+    # sys.stderr.write("Zero repeat reads: {0}\t({1:.2f}%)\n".format(zero[0], zero[0]/total*100))
+    # sys.stderr.write("Non-consensus reads: {0}\t({1:.2f}%)\n".format(bad[0], bad[0]/total*100))
 
 if __name__ == '__main__':
     main()
