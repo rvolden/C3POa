@@ -139,7 +139,7 @@ else:
     consensus = 'consensus.py'
 
 consensus = 'python3 ' + consensus
-path = args.path + '/'
+path = args.path
 
 input_file = args.reads
 score_matrix = args.matrix
