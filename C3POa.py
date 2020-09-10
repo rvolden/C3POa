@@ -528,6 +528,7 @@ def determine_consensus(name, seq, peaks, qual, median_distance, seed, temp_fold
 
         if len(lengths) == 2:
             Qual_Fasta = open(pairwise, 'w')
+
             for read in reads:
                 if 'CONSENS' not in read:
                     Qual_Fasta.write('>' + read + '\n' + reads[read] + '\n')
@@ -619,7 +620,7 @@ def read_fastq_file(seq_file):
             avgQ = sum([ord(x)-33 for x in line])/len(line)
             read_list[-1].append(avgQ)
             read_list[-1].append(len(read_list[-1][2]))
-            read_list[-1] = tuple(read_list[-1])
+            # read_list[-1] = tuple(read_list[-1])
             lastPlus = False
 
         lineNum += 1
