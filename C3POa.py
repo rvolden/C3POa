@@ -597,14 +597,15 @@ def read_fastq_file(seq_file):
         # make an entry as a list and append the header to that list
         if lineNum % 4 == 0 and line[0] == '@':
             splitLine = line[1:].split('_')
+            root, seed = splitLine[0], int(splitLine[1])
             # Kayla: edited to handle hairpin split reads with pre and post
-            if len(splitLine) == 2:
-                root, seed = splitLine[0], int(splitLine[1])
-            else:
-                root, seed = splitLine[0]+'_'+splitLine[1], int(splitLine[2])
-            read_list.append([])
-            read_list[-1].append(root)
-            read_list[-1].append(seed)
+            # if len(splitLine) == 2:
+            #     root, seed = splitLine[0], int(splitLine[1])
+            # else:
+            #     root, seed = splitLine[0]+'_'+splitLine[1], int(splitLine[2])
+            read_list.append([root, seed])
+            # read_list[-1].append(root)
+            # read_list[-1].append(seed)
 
         # sequence
         if lineNum % 4 == 1:
