@@ -66,15 +66,17 @@ def normalizeLen(seq, quality):
     '''
     seqIndex, qualIndex = 0, 0
     newQuality = ''
-    while qualIndex + 1 != len(quality):
+    while qualIndex < len(quality):
         if seq[seqIndex] != '-':
             newQuality += quality[qualIndex]
             qualIndex += 1
             seqIndex += 1
-        if seq[seqIndex] == '-':
+        elif seq[seqIndex] == '-' and qualIndex == 0:
+            newQuality += quality[qualIndex]
+            seqIndex += 1
+        else:
             newQuality += chr(int((ord(quality[qualIndex-1]) + ord(quality[qualIndex]))/2))
             seqIndex += 1
-    newQuality += quality[-1]
     if len(seq) != len(newQuality):
         gapLen = 0
         while seq[-1-gapLen] == '-':
@@ -103,8 +105,10 @@ def fastaReader(inFile):
 def fastqReader(inFile):
     '''Reads in FASTQ files. Only returns sequence and quality lines.'''
     sequences, quality, lineNum = [], [], 0
+#    print('fastq')
     for line in inFile:
         line = line.rstrip()
+#        print(line)
         if not line:
             continue
         # sequences
