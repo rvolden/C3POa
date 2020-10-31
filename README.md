@@ -2,44 +2,35 @@
 
 C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.
 
-**This version of C3POa uses a new aligner (gonk). The old version of C3POa that uses water can be found [here](https://github.com/rvolden/C3POa/tree/water).**
+This version of C3POa changes a lot. The old gonk branch can be found [here](https://github.com/rvolden/C3POa/tree/gonk). The even older version that uses water can be found [here](https://github.com/rvolden/C3POa/tree/water).
+It should be noted that this version is very memory intensive, which may change in the future.
 
 ## Dependencies
 
-- [Python >= 3.6](https://www.python.org/downloads/)
-- [NumPy >= 1.13.3](https://scipy.org/install.html)
-- [poa v1.0.0 Revision: 1.2.2.9](https://github.com/tanghaibao/bio-pipeline)
-- [Go](https://golang.org/dl/)
-- [gonk](https://github.com/rvolden/gonk)
-- [minimap2 2.7-r654](https://github.com/lh3/minimap2)
+- [Python 3](https://www.python.org/downloads/)
+- [NumPy](https://pypi.org/project/numpy/)
+- [SciPy](https://pypi.org/project/scipy/)
+- [pyabpoa](https://pypi.org/project/pyabpoa/)
+- [mappy](https://pypi.org/project/mappy/)
+- [tqdm](https://pypi.org/project/tqdm/)
+- [Cython](https://pypi.org/project/Cython/)
+- [conk](https://github.com/rvolden/conk)
 - [racon](https://github.com/isovic/racon)
 - [blat source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or [blat executable](http://hgdownload.soe.ucsc.edu/admin/exe/)
 
 To fetch and build dependencies, use setup.sh.<br>
-setup.sh will download and make the packages that you need to run C3POa (except Python, NumPy, Go, and blat).<br>
-You don't need to have these in your PATH, but if you don't, you'll need to use a [config file](example_config). The setup script **does not** install programs or add them to your path. If you use the setup script, you still need to put the paths into a config file.
+setup.sh will download and make the packages that you need to run C3POa (except for blat).<br>
+You don't need to have these in your PATH, but if you don't, you'll need to use a [config file](example_config).
+The setup script **does not** install programs or add them to your path.
+If you use the setup script, you still need to put the paths into a config file (for blat and racon).
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-To install NumPy, you can go [here](https://scipy.org/install.html).<br>
-Otherwise, you can use your computer's package manager (apt-get, dnf, brew, etc.) to install.<br>
-Pip3 is another option for NumPy installation.<br>
-Example:
-
-```bash
-sudo dnf install python3-numpy
-```
-
-or
-
-```bash
-pip3 install numpy
-```
-
-For blat, there are a couple options. You can build from [source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or you can get an [executable](http://hgdownload.soe.ucsc.edu/admin/exe/). Please follow the documentation in the blat readme for make instructions.
+Blat can built from [source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or you can get an [executable](http://hgdownload.soe.ucsc.edu/admin/exe/).
+Please follow the documentation in the blat readme for make instructions.
 
 --------------------------------------------------------------------------------
 
@@ -47,108 +38,71 @@ For blat, there are a couple options. You can build from [source](https://users.
 
 After resolving all of the dependencies, you can run C3POa with python.
 
-## C3POa_preprocessing.py
+## C3POa.py
 
-Takes raw 1D nanopore R2C2 reads in fastq format, removes low quality and short reads and then finds splint sequences in those reads using BLAT.
-It then adds the position of the splint to the read name.
+Preprocessing is now built in.
+Preprocessing takes raw 1D nanopore R2C2 reads in fastq (can be zipped) format, removes low quality and short reads and then finds splint sequences in those reads using BLAT.
 Preprocessing will also demultiplex reads based on splints that are put into the splint fasta file.
-You should end up with a directory that looks like: `somePath/Splint_1/R2C2_raw_reads.fastq` where Splint_1 would be which Splint that particular read was classified with.
+The preprocessor will also look for the alignment psl file in case it was done before.
+C3POa won't do the alignment if it finds `output_dir/tmp/splint_to_read_alignments.psl`.
 
-Options (All required):
+The main algorithmic difference is we only align the splint to the read.
+Command line tools have been replaced with their python APIs (except blat and racon).
 
+```bash
+python3 C3POa.py -r reads.fastq 
+                 -o output/path 
+                 -s splint.fasta 
+                 -c config 
+                 -q 9 
+                 -l 1000 
+                 -d 500
+                 -n 32 
+                 -g 1000
 ```
-  -i  raw reads in fastq format
 
-  -o  path where a splint_reads folder with the output files will be generated
+Arguments:
+```
+  -r  raw reads in fastq format
 
+  -o  output path
+
+  -s  sequence of DNA splint used in R2C2 protocol in fasta format
+  
+  -c  config file containing path to BLAT and racon binaries
+  
   -q  only reads above this average quality will be retained (9 is recommended)
 
   -l  only reads longer than this number will be retained (1000 recommended)
 
-  -s  sequence of DNA splint used in R2C2 protocol in fasta format
+  -d  minimum distance between peaks/minimum insert size. For cDNA, we use 500 (default)
 
-  -c  config file containing path to BLAT binary
-```
+  -n  number of threads to use
 
-```bash
-python3 C3POa_preprocessing.py -i raw_reads.fastq -o output_path -q quality_cutoff
-                               -l read_length_cutoff -s Splint_sequence.fasta
-```
-
-Example input read:
-
-```
-@63f115bc-6a91-42bd-a78a-667fd8255069
-ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA
-+
-"01&%"."I;"CSA"qr{X"uvc"\n"ggZ"Swj"yq"{wD"{z
-```
-
-Example output read (10 would be a splint position):
-
-```
-@63f115bc-6a91-42bd-a78a-667fd8255069_10
-ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA
-+
-"01&%"."I;"CSA"qr{X"uvc"\n"ggZ"Swj"yq"{wD"{z
-```
-
---------------------------------------------------------------------------------
-
-## C3POa.py
-
-Takes fastq output produced by C3POa_preprocessing.py and generates consensus sequences in fasta format and a subread sequences in fastq format.
-C3POa now natively supports multiprocessing.
-
-Options:
-
-```
-  -p  directory to which all temporary files will be written. Also where your final consensus
-      file will end up. Defaults to your current directory
-
-  -m  path to NUC.4.4.mat file (included in repository)
-
-  -l  raw sequence length cutoff. Defaults to 1000
-
-  -d  median distance between peaks cutoff. This should be the length of your shortest
-      input sequence in your library preparation. Defaults to 500
-
-  -c  config file containing paths to poa, racon, gonk, blat, and minimap2
+  -g  group size (number of reads given to each thread)
 
   -z  use to exclude zero repeat reads
-
-  -r  fastq file that contains reads generated by C3POa_preprocessing.py
-
-  -t  use to print how long each dependency takes to run
-
-  -n  the number of threads to use in multiprocessing. Defaults to 1
-
-  -g  the number of reads processed by each thread. Defaults to 1000
-
-  -s  the name of the sample. Defaults to R2C2
 ```
-
-```bash
-python3 C3POa.py -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -l 1000
-                 -t 8 -g 1000 -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
-```
-
-Timing things and excluding zero repeat reads:
-
-```bash
-python3 C3POa.py -t -z -r preprocessed_reads.fastq -p outpath -m path/to/NUC.4.4.mat -l 1000
-                 -d 500 -c /path/to/config_file -o /path/to/consensus.fasta
-```
-
-When you include -t (--timer), gonk, poa, racon, and consensus.py will be timed (times are directed to stdout).
-
-When you include -z (--zero), C3POa will exclude zero repeat reads.
 
 Example output read (readName_averageQuality_originalReadLength_numberOfRepeats_subreadLength):
 
 ```
 >efbfbf09-7e2b-48e6-8e57-b3d36886739c_46.53_5798_2_1844
 ACAGTCGATCATAGCTTAGCATGCATCGACGATCGATCGATCGA...
+```
+
+Example output directory tree:
+```
+output_dir
+├── c3poa.log
+├── tmp
+│   └── splint_to_read_alignments.psl
+├── Splint_1
+│   ├── R2C2_Consensus.fasta
+│   └── R2C2_Subreads.fastq
+└── Splint_2
+    ├── R2C2_Consensus.fasta
+    └── R2C2_Subreads.fastq
 ```
 
 --------------------------------------------------------------------------------
