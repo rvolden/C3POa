@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 # Roger Volden
 
-'''
-Take a FASTA file with aligned reads and a FASTQ file to make a consensus
-based on quality as well as base frequency at certain positions.
-FASTA file with aligned reads can also come as .fasta from EMBOSS needle.
-
-Usage: python3 consensus.py aligned.fastq reads.fastq >consensus.fasta
-'''
-
 def consensus(sequences, qualityDict):
     '''
     Makes a consensus sequence based on base frequency and quality.
