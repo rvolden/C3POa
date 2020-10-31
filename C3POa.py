@@ -1,62 +1,23 @@
 #!/usr/bin/env python3
-# Roger Volden and Chris Vollmers
-# Last updated: 26 March 2020 by Roger Volden
-
-'''
-Concatemeric Consensus Caller with Partial Order Alignments (C3POa)
-
-Analyses reads by reading them in, doing self-self alignments, calling
-peaks in alignment scores,  splitting reads, aligning those to each other,
-and giving back a consensus sequence.
-
-Usage:
-    python3 C3POa.py --reads reads.fastq [--path /current/directory]
-
-Dependencies:
-    Python 3.6
-    NumPy 1.13.3
-    poa v1.0.0 Revision: 1.2.2.9500
-    gonk
-    minimap2 2.7-r654
-    racon
-
-02/08/2018 Release note:
-    By default, this will now output what we call zero repeat reads along
-    with the rest of the R2C2 reads. Zero repeat reads are reads that contain
-    a splint with incomplete portions of your original molecule on each side.
-    If there's an overlap, it'll align the portions that overlap and
-    concatenate the rest of the read together to try and make a contiguous
-    read. These reads are very similar to normal 1D reads, but there are a few
-    cases where there is a slight improvement. There will be an option to
-    remove these reads in postprocessing.
-
-02/27/2019 Release note:
-    I have changed the aligner to gonk over water for faster alignments. Because
-    gonk does not do a complete alignment, I have removed support for zero repeat
-    reads. This is because zero repeat reads only increase the number of reads
-    you end up with instead of increasing the quality of the dataset. The old
-    version of C3POa can be found at https://github.com/rvolden/C3POa/tree/water.
-
-06/11/2019 Release note:
-    I've added back in support for zero repeat reads. It can still be toggled off
-    by using the -z or --zero options.
-
-03/26/2020 Release note:
-    Added in native multiprocessing support. There are two extra options pertaining
-    to mp: numThreads and groupSize. numThreads determines the number of threads
-    to consensus call on (defaults to 1). groupSize determines the number of reads
-    that each thread will process at a time. Reads are chunked and assigned a thread
-    in a threadpool. The default number of reads per group is 1000.
-'''
+# Roger Volden
 
 import os
 import sys
 import numpy as np
 import argparse
-from time import time
 import multiprocessing as mp
+import mappy as mm
+from conk import conk
+from tqdm import tqdm
 
-def argParser():
+path = '/'.join(os.path.realpath(__file__).split('/')[:-1])+'/bin/'
+sys.path.append(os.path.abspath(path))
+
+from preprocess import preprocess
+from call_peaks import call_peaks
+from determine_consensus import determine_consensus
+
+def parse_args():
     '''Parses arguments.'''
     parser = argparse.ArgumentParser(description = 'Makes consensus sequences \
                                                     from R2C2 reads.',
@@ -65,18 +26,16 @@ def argParser():
     required = parser.add_argument_group('required arguments')
     required.add_argument('--reads', '-r', type=str, action='store', required=True,
                           help='FASTQ file that contains the long R2C2 reads.')
-    parser.add_argument('--path', '-p', type=str, action='store', default=os.getcwd(),
-                        help='Directory where all the files are/where they will end up.\
+    required.add_argument('--splint_file', '-s', type=str, action='store', required=True,
+                        help='Path to the splint FASTA file.')
+    parser.add_argument('--out_path', '-o', type=str, action='store', default=os.getcwd(),
+                        help='Directory where all the files will end up.\
                               Defaults to your current directory.')
-    parser.add_argument('--matrix', '-m', type=str, action='store',
-                        default='NUC.4.4.mat',
-                        help='Score matrix to use for poa.\
-                              Defaults to NUC.4.4.mat.')
     parser.add_argument('--config', '-c', type=str, action='store', default='',
                         help='If you want to use a config file to specify paths to\
-                              programs, specify them here. Use for poa, racon, gonk,\
-                              blat, and minimap2 if they are not in your path.')
-    parser.add_argument('--slencutoff', '-l', type=int, action='store', default=1000,
+                              programs, specify them here. Use for racon and blat\
+                              if they are not in your path.')
+    parser.add_argument('--lencutoff', '-l', type=int, action='store', default=1000,
                         help='Sets the length cutoff for your raw sequences. Anything\
                               shorter than the cutoff will be excluded. Defaults to 1000.')
     parser.add_argument('--mdistcutoff', '-d', type=int, action='store', default=500,
@@ -84,627 +43,180 @@ def argParser():
                               Anything shorter will be excluded. Defaults to 500.')
     parser.add_argument('--zero', '-z', action='store_false', default=True,
                         help='Use to exclude zero repeat reads. Defaults to True (includes zero repeats).')
-    parser.add_argument('--timer', '-t', action='store_true', default=False,
-                        help='Prints how long each dependency takes to run.\
-                              Defaults to False.')
-    parser.add_argument('--figure', '-f', action='store_true', default=False,
-                        help='Use if you want to output a histogram of scores.')
     parser.add_argument('--numThreads', '-n', type=int, default=1,
-                        help='Number of threads to use during multiprocessing.')
+                        help='Number of threads to use during multiprocessing. Defaults to 1.')
     parser.add_argument('--groupSize', '-g', type=int, default=1000,
-                        help='Number of reads processed by each thread in each iteration.')
-    parser.add_argument('--sample', '-s', type=str, action='store', default='R2C2',
-                        help='Name of sample in snake or camel case.')
-
+                        help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
     return parser.parse_args()
 
-def configReader(configIn):
-    '''Parses the config file.'''
+def configReader(path, configIn):
     progs = {}
-    for line in open(configIn):
-        if line.startswith('#') or not line.rstrip().split():
-            continue
-        line = line.rstrip().split('\t')
-        progs[line[0]] = line[1]
-    # should have minimap, poa, racon, gonk, consensus
-    # check for extra programs that shouldn't be there
-    possible = set(['poa', 'minimap2', 'gonk', 'consensus', 'racon', 'blat'])
+    with open(configIn) as f:
+        for line in f:
+            if line.startswith('#') or not line.rstrip().split():
+                continue
+            line = line.rstrip().split('\t')
+            progs[line[0]] = line[1]
+    possible = set(['racon', 'blat'])
     inConfig = set()
     for key in progs.keys():
         inConfig.add(key)
-        # if key not in possible:
-        #     raise Exception('Check config file')
     # check for missing programs
     # if missing, default to path
     for missing in possible-inConfig:
-        if missing == 'consensus':
-            path = 'consensus.py'
-        else:
-            path = missing
+        path = missing
         progs[missing] = path
         sys.stderr.write('Using ' + str(missing)
                          + ' from your path, not the config file.\n')
     return progs
 
-args = argParser()
-if args.config:
-    progs = configReader(args.config)
-    minimap2 = progs['minimap2']
-    poa = progs['poa']
-    racon = progs['racon']
-    gonk = progs['gonk']
-    consensus = progs['consensus']
-else:
-    minimap2, poa, racon, gonk = 'minimap2', 'poa', 'racon', 'gonk'
-    consensus = 'consensus.py'
-
-consensus = 'python3 ' + consensus
-path = args.path + '/'
-
-input_file = args.reads
-score_matrix = args.matrix
-
-numThreads = args.numThreads
-sample = args.sample
-groupSize = args.groupSize
-
-seqLenCutoff = args.slencutoff
-medDistCutoff = args.mdistcutoff
-
-zero_repeat = args.zero
-timer = args.timer
-figure = args.figure
-
-good, bad, zero = [0], [0], [0]
-
-def revComp(sequence):
-    '''Returns the reverse complement of a sequence'''
-    bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
-    return ''.join([bases[x] for x in list(sequence)])[::-1]
-
-def split_read(split_list, sequence, out_file1, qual, out_file1q, name,median_distance,sub):
-    '''
-    split_list : list, peak positions
-    sequence : str
-    out_file1 : output FASTA file
-    qual : str, quality line from FASTQ
-    out_file1q : output FASTQ file
-    name : str, read ID
-
-    Writes sequences to FASTA and FASTQ files.
-    Returns number of repeats in the sequence.
-    '''
-    out_F = open(out_file1, 'w')
-    out_Fq = open(out_file1q, 'w')
-    lengths = []
-    for i in range(len(split_list) - 1):
-        split1 = split_list[i]
-        split2 = split_list[i+1]
-        if len(sequence[split1:split2]) > 30 and \
-                median_distance*0.8 < len(sequence[split1:split2]) < median_distance*1.2:
-            lengths.append(len(sequence[split1:split2]))
-            out_F.write('>' + str(i + 1) + '\n' \
-                        + sequence[split1:split2] + '\n')
-            out_Fq.write('@' + str(i + 1) + '\n' \
-                         + sequence[split1:split2] + '\n+\n' \
-                         + qual[split1:split2] + '\n')
-            sub.write('@' + name + '_' + str(i + 1) +' \n' \
-                      + sequence[split1:split2] + '\n+\n' \
-                      + qual[split1:split2] + '\n')
-
-    if len(sequence[:split_list[0]]) > 50:
-        out_Fq.write('@' + str(0) + '\n' \
-                     + sequence[0:split_list[0]] + '\n+\n' \
-                     + qual[0:split_list[0]] + '\n')
-        sub.write('@' + name + '_' + str(0) + '\n' \
-                  + sequence[0:split_list[0]] + '\n+\n' \
-                  + qual[0:split_list[0]] + '\n')
-
-    if len(sequence[split2:]) > 50:
-        out_Fq.write('@' + str(i + 2) + '\n' \
-                     + sequence[split2:] + '\n+\n' \
-                     + qual[split2:] + '\n')
-        sub.write('@' + name + '_' + str(i + 2) + '\n' \
-                  + sequence[split2:] + '\n+\n' \
-                  + qual[split2:] + '\n')
-    repeats = str(int(i + 1))
-    out_F.close()
-    out_Fq.close()
-    return repeats, lengths
-
-def read_fasta(inFile):
-    '''Reads in FASTA files, returns a dict of header:sequence'''
-    readDict = {}
-    for line in open(inFile):
-        line = line.rstrip()
-        if not line:
-            continue
-        if line.startswith('>'):
-            if readDict:
-                readDict[lastHead] = ''.join(readDict[lastHead])
-            readDict[line[1:]] = []
-            lastHead = line[1:]
-        else:
-            readDict[lastHead].append(line)
-    if readDict:
-        readDict[lastHead] = ''.join(readDict[lastHead])
-    return readDict
-
 def rounding(x, base):
     '''Rounds to the nearest base, we use 50'''
     return int(base * round(float(x)/base))
 
-def makeFig(scoreList, peaks, seed, filtered_peaks):
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as mplpatches
-    plt.style.use('BME163')
-    plt.figure(figsize = (10, 5))
-    hist = plt.axes([0.1, 0.1, 8/10, 4/5], frameon = True)
-
-    xlist = [x for x in range(0, len(filtered_peaks))]
-    hist.plot(xlist, filtered_peaks, color =  (0, 68/255, 85/255),
-              lw = 1, zorder = 550)
-    ylim = max(scoreList) * 1.1
-    ymin = min(filtered_peaks)*1.5
-    xlim = len(scoreList)
-
-    for i in range(len(scoreList)):
-        if np.in1d(i, peaks):
-            color = (0.96, 0.43, 0.2)
-            peakMark = mplpatches.Rectangle((i-12.5, filtered_peaks[i]), 25, ylim,
-                                            lw=0, fc=color, zorder=0)
-            hist.add_patch(peakMark)
-        color = (0, 191/255, 165/255)
-        score = mplpatches.Rectangle((i, 0), 1, scoreList[i],
-                                     lw=0, fc=color, zorder=100)
-        hist.add_patch(score)
-
-    hist.set_ylim(ymin, ylim)
-    hist.set_xlim(0, xlim)
-    hist.set_ylabel('Alignment Score', fontsize = 11, labelpad = 6.5)
-    hist.set_xlabel('Read position', fontsize = 11, labelpad = 6)
-    hist.tick_params(axis='both',which='both',\
-                     bottom='on', labelbottom='on',\
-                     left='on', labelleft='on',\
-                     right='off', labelright='off',\
-                     top='off', labeltop='off')
-
-    plt.savefig('plumetest.png', dpi = 600)
-    plt.close()
-    sys.exit()
-
-def savitzky_golay(y, window_size, order, deriv=0, rate=1, returnScoreList=False):
-    '''
-    Smooths over data using a Savitzky Golay filter
-    This can either return a list of scores, or a list of peaks
-
-    y : array-like, score list
-    window_size : int, how big of a window to smooth
-    order : what order polynomial
-    returnScoreList : bool
-    '''
-    from math import factorial
-    y = np.array(y)
-    try:
-        window_size = np.abs(np.int(window_size))
-        order = np.abs(np.int(order))
-    except ValueError:
-        raise ValueError("window_size and order have to be of type int")
-    if window_size % 2 != 1 or window_size < 1:
-        raise TypeError("window_size size must be a positive odd number")
-    if window_size < order + 2:
-        raise TypeError("window_size is too small for the polynomials order")
-    order_range = range(order + 1)
-    half = (window_size -1) // 2
-    # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half, half + 1)])
-    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
-    # pad the signal at the extremes with values taken from the signal itself
-    firstvals = y[0] - np.abs( y[1:half+1][::-1] - y[0] )
-    lastvals = y[-1] + np.abs(y[-half-1:-1][::-1] - y[-1])
-    y = np.concatenate((firstvals, y, lastvals))
-    filtered = np.convolve( m[::-1], y, mode='valid')
-
-    if returnScoreList:
-        return np.convolve( m[::-1], y, mode='valid')
-
-    # set everything between 1 and -inf to 1
-    posFiltered = []
-    for i in range(len(filtered)):
-        if 1 > filtered[i] >= -np.inf:
-            posFiltered.append(1)
-        else:
-            posFiltered.append(filtered[i])
-
-    # use slopes to determine peaks
-    peaks = []
-    slopes = np.diff(posFiltered)
-    la = 45 # how far in sequence to look ahead
-    for i in range(len(slopes) - 50):
-        if i > len(slopes) - la: # probably irrelevant now
-            dec = all(slopes[i+x] <= 0 for x in range(1, 50))
-            if slopes[i] > 0 and dec:
-                if i not in peaks:
-                    peaks.append(i)
-        else:
-            dec = all(slopes[i+x] <= 0 for x in range(1, la))
-            if slopes[i] > 0 and dec:
-                peaks.append(i)
-    return peaks
-
-def callPeaks(scoreList):
-    '''
-    scoreList : list of scores
-    returns a sorted list of all peaks
-    '''
-    maxScore = max(scoreList)
-    noise = maxScore*0.05
-
-    for j in range(len(scoreList)):
-        if scoreList[j] <= noise:
-            scoreList[j] = 1
-
-    # Smooth over the data
-    smoothedScores = savitzky_golay(scoreList, 21, 2, deriv = 0,
-                                     rate = 1, returnScoreList = True)
-    peaks = savitzky_golay(smoothedScores, 51, 1, deriv = 0,
-                            rate = 1, returnScoreList = False)
-    # Add all of the smoothed peaks to list of all peaks
-    sortedPeaks = sorted(list(set(peaks)))
-
-    if not sortedPeaks:
-        return [], -1
-    finalPeaks = [sortedPeaks[0]]
-    for i in range(1, len(sortedPeaks)):
-        if sortedPeaks[i-1] < sortedPeaks[i] < sortedPeaks[i-1] + 100:
+def analyze_reads(args, reads, splint_dict, adapter_dict, adapter_set, iteration, racon):
+    penalty, iters, window, order = 20, 3, 41, 2
+    for read in reads:
+        name, seq, qual = read[0], read[1], read[2]
+        seq_len = len(seq)
+        if not adapter_dict.get(name):
             continue
+        strand = adapter_dict[name][1]
+        if strand == '-':
+            # use reverse complement of the splint
+            splint = splint_dict[adapter_dict[name][0]][1]
         else:
-            finalPeaks.append(sortedPeaks[i])
-    if figure:
-        return finalPeaks, smoothedScores
-
-    # calculates the median distance between detected peaks
-    forMedian = []
-    for i in range(len(finalPeaks) - 1):
-        forMedian.append(finalPeaks[i+1] - finalPeaks[i])
-    forMedian = [rounding(x, 50) for x in forMedian]
-    medianDistance = np.median(forMedian)
-    return finalPeaks, medianDistance
-
-def parse_file(scores):
-    '''
-    scores : gonk output file
-    Returns:
-        scoreList : list, diagonal alignment scores
-    '''
-    scoreList = []
-    for line in open(scores):
-        line = line.rstrip().split(':')
-        value = int(line[1])
-        scoreList.append(value)
-    return scoreList
-
-def runGonk(seq1, seq2, sub_folder):
-    '''Runs gonk using the sequences given by split_SW'''
-    go_start = time()
-    os.system('{0} -a seq1.fasta -b seq2.fasta -p 20 \
-              -o {1}/SW_PARSE.txt 2>./gonk_messages'.format(gonk, sub_folder))
-    go_stop = time()
-    if timer:
-        print('gonk took ' + str(go_stop - go_start) + ' seconds to run.')
-    scores = sub_folder + '/SW_PARSE.txt'
-    scoreList = parse_file(scores)
-    os.system('rm {0}'.format(scores))
-    return scoreList
-
-def split_SW(name, seed, seq, sub_folder):
-    '''
-    Takes a sequence and does the gonk alignment to itself
-    Returns a list of scores from summing diagonals from the
-    alignment matrix.
-    name (str): the sequence header
-    seq (str): nucleotide sequence
-    '''
-    total = len(seq)
-    reverse = False
-    if seed + 1000 > total:
-        start = max(0, seed-1000)
-        seq1 = revComp(seq[start:seed])
-        seq = revComp(seq)
-        reverse = True
-    else:
-        seq1 = seq[seed:seed+1000]
-
-    align_file1 = open('seq1.fasta', 'w')
-    align_file1.write('>' + name + '\n' + seq1 + '\n')
-    align_file1.close()
-    align_file2 = open('seq2.fasta', 'w')
-    align_file2.write('>' + name + '\n')
-    for i in range(0, len(seq), 5000):
-        align_file2.write(seq[i:i+5000] + '\n')
-    align_file2.close()
-
-    scoreList = runGonk(seq1, seq, sub_folder)
-    if reverse:
-        scoreList = scoreList[::-1]
-    return scoreList
-
-def extract_overlap(overlap_paf, fastq_dict):
-    overlap = {}
-    for line in open(overlap_paf):
-        line = line.strip().split('\t')
-        name1, start1, end1 = line[0], int(line[2]), int(line[3])
-        name2, start2, end2 = line[5], int(line[7]), int(line[8])
-        if name1 != name2:
-            left = fastq_dict[name1][0][:start1]
-            right = fastq_dict[name2][0][end2:]
-            # put the sequence and quality chunks into the overlap dictionary
-            overlap[name1] = [fastq_dict[name1][0][start1:end1], fastq_dict[name1][1][start1:end1]]
-            overlap[name2] = [fastq_dict[name2][0][start2:end2], fastq_dict[name2][1][start2:end2]]
-            return left, overlap, right
-    return '', {}, ''
-
-def determine_consensus(name, seq, peaks, qual, median_distance, seed, temp_folder, sub):
-    '''
-    Aligns and returns the consensus depending on the number of repeats
-    If there are multiple peaks, it'll do the normal partial order
-    alignment with racon correction
-    If there are two repeats, it'll do the special pairwise consensus
-    making
-    '''
-    repeats = ''
-    corrected_consensus = ''
-    out_F = temp_folder + '/' + name + '_F.fasta'
-    out_Fq = temp_folder + '/' + name + '_F.fastq'
-    poa_cons = temp_folder + '/' + name + '_consensus.fasta'
-    pairwise = temp_folder + '/' + name + '_prelim_consensus.fasta'
-
-    if len(peaks) == 1 and zero_repeat:
-        zero[0] += 1
-        seed = peaks[0]
-        seq1, qual1 = seq[seed:], qual[seed:]
-        seq2, qual2 = seq[:seed], qual[:seed]
-
-        overlap_paf = temp_folder + '/' + name + '_overlaps.paf'
-        PIR = temp_folder + '/' + name + '_F_poa.fasta'
-        overlap_fasta = temp_folder +'/' + name + '_overlaps.fasta'
-        overlap_fastq = temp_folder +'/' + name + '_overlaps.fastq'
-
-        fasta = open(out_F, 'w')
-        fastq_dict = {}
-        fastq_dict[name + '_1'] = [seq1, qual1]
-        fastq_dict[name + '_2'] = [seq2, qual2]
-
-        fasta.write('>' + name + '_1\n' + seq1 + '\n')
-        fasta.write('>' + name + '_2\n' + seq2 + '\n')
-        fasta.close()
-        os.system('pwd')
-        os.system('%s -x ava-ont %s %s > %s \
-                  2> ./minimap2_messages' \
-                  %(minimap2, out_F, out_F, overlap_paf))
-
-        left, overlap, right = extract_overlap(overlap_paf, fastq_dict)
-        if overlap:
-            o_fasta = open(overlap_fasta, 'w')
-            o_fastq = open(overlap_fastq, 'w')
-
-            for read in overlap:
-                o_fasta.write('>' + read + '\n' + overlap[read][0] + '\n')
-                o_fastq.write('@' + read + '\n' + overlap[read][0] + '\n+\n' + overlap[read][1] + '\n')
-            o_fasta.close()
-            o_fastq.close()
-            os.system('%s -read_fasta %s -hb -pir %s \
-                      -do_progressive %s 2>./poa_messages' \
-                      %(poa, overlap_fasta, PIR, score_matrix))
-
-            reads = read_fasta(PIR)
-            Qual_Fasta = open(pairwise, 'w')
-            for read in reads:
-                if 'CONSENS' not in read:
-                    Qual_Fasta.write('>' + read + '\n' + reads[read] + '\n')
-            Qual_Fasta.close()
-            os.system('%s %s %s %s >> %s' \
-                      %(consensus, pairwise, overlap_fastq, name, poa_cons))
-            reads = read_fasta(poa_cons)
-            for read in reads:
-                corrected_consensus = left + reads[read] + right
-            repeats = 0
-
-    elif median_distance > medDistCutoff and len(peaks) >= 1:
-        good[0] += 1
-        final = temp_folder + '/' + name + '_corrected_consensus.fasta'
-        overlap = temp_folder + '/' + name + '_overlaps.sam'
-        repeats, lengths = split_read(peaks, seq, out_F, qual, out_Fq, name, median_distance, sub)
-
-        PIR = temp_folder + '/' + name + '_F.fasta'
-        poa_start = time()
-        os.system('%s -read_fasta %s -hb -pir %s \
-                  -do_progressive %s 2>./poa_messages' \
-                  %(poa, out_F, PIR, score_matrix))
-        poa_stop = time()
-        if timer:
-            print('POA took ' + str(poa_stop - poa_start) + ' seconds to run.')
-        reads = read_fasta(PIR)
-
-        if len(lengths) == 2:
-            Qual_Fasta = open(pairwise, 'w')
-
-            for read in reads:
-                if 'CONSENS' not in read:
-                    Qual_Fasta.write('>' + read + '\n' + reads[read] + '\n')
-            Qual_Fasta.close()
-            conspy_start = time()
-            os.system('%s %s %s %s >> %s' \
-                      %(consensus, pairwise, out_Fq, name, poa_cons))
-            conspy_stop = time()
-            if timer:
-                print('consensus.py took ' + str(conspy_stop - conspy_start) \
-                      + ' seconds to run.')
-
-        else:
-            for read in reads:
-              if 'CONSENS0' in read:
-                out_cons_file = open(poa_cons, 'w')
-                out_cons_file.write('>' + name + '\n' \
-                                    + reads[read].replace('-', '') + '\n')
-                out_cons_file.close()
-
-        final = poa_cons
-        input_cons = poa_cons
-        output_cons = poa_cons.replace('.fasta', '_1.fasta')
-        mm_start = time()
-        os.system('%s --secondary=no -ax map-ont \
-                  %s %s > %s 2> ./minimap2_messages' \
-                  %(minimap2, input_cons, out_Fq, overlap))
-        mm_stop = time()
-        if timer:
-            print('minimap2 took ' + str(mm_stop - mm_start) \
-                  + ' seconds to run.')
-        racon_start = time()
-        os.system('%s -q 5 -t 1 \
-                  %s %s %s >%s 2>./racon_messages' \
-                  %(racon, out_Fq, overlap, input_cons, output_cons))
-        racon_stop = time()
-        if timer:
-            print('Racon took ' + str(racon_stop - racon_start) \
-                  + ' seconds to run.')
-        final = output_cons
-        print(final)
-        reads = read_fasta(final)
-        for read in reads:
-            corrected_consensus = reads[read]
-    else:
-        bad[0] += 1
-
-    return corrected_consensus, repeats
-
-def read_fastq_file(seq_file):
-    '''
-    Takes a FASTQ file and returns a list of tuples
-    In each tuple:
-        name : str, read ID
-        seed : int, first occurrence of the splint
-        seq : str, sequence
-        qual : str, quality line
-        average_quals : float, average quality of that line
-        seq_length : int, length of the sequence
-    '''
-    read_list, lineNum = [], 0
-    for line in open(seq_file):
-        line = line.rstrip()
-        if not line:
+            splint = splint_dict[adapter_dict[name][0]][0]
+        scores = conk.conk(splint, seq, penalty)
+        peaks = call_peaks(scores, args.mdistcutoff, iters, window, order)
+        if not list(peaks):
             continue
-        # make an entry as a list and append the header to that list
-        if lineNum % 4 == 0 and line[0] == '@':
-            splitLine = line[1:].split('_')
-            root, seed = splitLine[0], int(splitLine[1])
-            # Kayla: edited to handle hairpin split reads with pre and post
-            # if len(splitLine) == 2:
-            #     root, seed = splitLine[0], int(splitLine[1])
-            # else:
-            #     root, seed = splitLine[0]+'_'+splitLine[1], int(splitLine[2])
-            read_list.append([root, seed])
-            # read_list[-1].append(root)
-            # read_list[-1].append(seed)
+        peaks = list(peaks + len(splint)//2)
+        for i in range(len(peaks)-1, -1, -1):
+            if peaks[i] >= seq_len:
+                del peaks[i]
+        if not peaks:
+            continue
 
-        # sequence
-        if lineNum % 4 == 1:
-            read_list[-1].append(line)
+        # check for outliers in subread length
+        subreads, qual_subreads = [], []
+        if len(peaks) > 1:
+            subread_lens = np.diff(peaks)
+            subread_lens = [rounding(x, 50) for x in subread_lens]
+            median_subread_len = np.median(subread_lens)
+            for i in range(len(subread_lens)):
+                bounds = [peaks[i], peaks[i+1]]
+                if median_subread_len*0.8 <= subread_lens[i] <= median_subread_len*1.2:
+                    subreads.append(seq[bounds[0]:bounds[1]])
+                    qual_subreads.append(qual[bounds[0]:bounds[1]])
+            if peaks[0] > 100:
+                subreads.append(seq[:peaks[0]])
+                qual_subreads.append(qual[:peaks[0]])
+            if seq_len - peaks[-1] > 100:
+                subreads.append(seq[peaks[-1]:])
+                qual_subreads.append(qual[peaks[-1]:])
+        else:
+            subreads.append(seq[:peaks[0]])
+            qual_subreads.append(qual[:peaks[0]])
+            subreads.append(seq[peaks[0]:])
+            qual_subreads.append(qual[peaks[0]:])
 
-        # quality header
-        if lineNum % 4 == 2:
-            lastPlus = True
+        tmp_dir = args.out_path + adapter_dict[name][0] + '/tmp' + str(iteration) + '/'
+        if not os.path.isdir(tmp_dir):
+            os.mkdir(tmp_dir)
+        subread_file = tmp_dir + 'subreads.fastq'
 
-        # quality
-        if lineNum % 4 == 3 and lastPlus:
-            read_list[-1].append(line)
-            avgQ = sum([ord(x)-33 for x in line])/len(line)
-            read_list[-1].append(avgQ)
-            read_list[-1].append(len(read_list[-1][2]))
-            # read_list[-1] = tuple(read_list[-1])
-            lastPlus = False
+        consensus, repeats = determine_consensus(
+            args, read, subreads, qual_subreads,
+            racon, tmp_dir, subread_file
+        )
 
-        lineNum += 1
+        if consensus:
+            avg_qual = round(sum([ord(x)-33 for x in qual])/seq_len, 2)
+            cons_len = len(consensus)
+            final_out = open(tmp_dir + '/R2C2_Consensus.fasta', 'a+')
+            print('>' + name + '_' + '_'.join([str(x) for x in [avg_qual, seq_len, repeats, cons_len]]), file=final_out)
+            print(consensus, file=final_out)
+            final_out.close()
 
-    return read_list
+def main(args):
+    if not args.out_path.endswith('/'):
+        args.out_path += '/'
+    if not os.path.exists(args.out_path):
+        os.mkdir(args.out_path)
+    log_file = open(args.out_path + 'c3poa.log', 'w+')
 
-def analyze_reads(read_list, iteration):
-    '''
-    Takes reads that are longer than 1000 bases and gives the consensus.
-    Writes to R2C2_Consensus.fasta
-    '''
-    # print(iteration)
-    sub_folder = path + '/tmp' + str(iteration)
-    os.system('rm -r %s' %(sub_folder))
-    os.system('mkdir %s' %(sub_folder))
-    final_out = open(sub_folder + '/R2C2_Consensus.fasta', 'w')
-    final_out.close()
-    subread_file = 'subreads.fastq'
-    if not os.path.isdir(sub_folder):
-        exit()
-    os.chdir(sub_folder)
+    progs = configReader(args.out_path, args.config)
+    racon = progs['racon']
+    blat = progs['blat']
+    tmp_dir = args.out_path + 'tmp/'
+    if not os.path.isdir(tmp_dir):
+        os.mkdir(tmp_dir)
 
-    sub = open(sub_folder + '/' + subread_file, 'w')
-    temp_folder = sub_folder + '/tmp'
-    if os.path.exists(temp_folder):
-        os.system('rm -r ' + temp_folder)
-    os.system('mkdir ' + temp_folder)
+    # read in the file and preprocess
+    read_list, total_reads = [], 0
+    short_reads = 0
+    tmp_fasta = tmp_dir + 'R2C2_temp_for_BLAT.fasta'
+    align_psl = tmp_dir + 'splint_to_read_alignments.psl'
+    make_tmp_fasta, tmp_adapter_dict = False, {}
+    if not os.path.exists(align_psl) or os.stat(align_psl).st_size == 0:
+        make_tmp_fasta = True
+        tmp_fa_fh = open(tmp_fasta, 'w')
+    for read in mm.fastx_read(args.reads, read_comment=False):
+        if len(read[1]) < args.lencutoff:
+            short_reads += 1
+            continue
+        read_list.append(read) # [(read_id, seq, qual), ...]
+        if make_tmp_fasta:
+            print('>' + read[0] + '\n' + read[1], file=tmp_fa_fh)
+        tmp_adapter_dict[read[0]] = [[None, 1, None]] # [adapter, matches, strand]
+        total_reads += 1
+    if make_tmp_fasta:
+        tmp_fa_fh.close()
 
-    for name, seed, seq, qual, average_quals, seq_length in read_list:
-        if seqLenCutoff < seq_length:
-            final_consensus = ''
-            scoreList = split_SW(name, seed, seq, sub_folder)
+    adapter_dict, adapter_set, no_splint = preprocess(blat, args.out_path, tmp_dir, read_list, args.splint_file, tmp_adapter_dict)
+    for adapter in adapter_set:
+        if not os.path.exists(args.out_path + adapter):
+            os.mkdir(args.out_path + adapter)
 
-            # calculate where peaks are and the median distance between them
-            peaks, median_distance = callPeaks(scoreList)
-            if not peaks and median_distance == -1:
-                continue
+    print('No splint reads:', no_splint, file=log_file)
+    print('Under len cutoff:', short_reads, file=log_file)
+    print('Total thrown away reads:', short_reads + no_splint, file=log_file)
+    log_file.close()
+ 
+    splint_dict = {}
+    for splint in mm.fastx_read(args.splint_file, read_comment=False):
+        splint_dict[splint[0]] = [splint[1]]
+        splint_dict[splint[0]].append(mm.revcomp(splint[1]))
 
-            if figure:
-                makeFig(scoreList, peaks, seed, median_distance)
-
-            # make the consensus
-            final_consensus, repeats = determine_consensus(name, seq, peaks,
-                                                           qual, median_distance,
-                                                           seed, temp_folder, sub)
-            if final_consensus:
-                final_out = open(sub_folder + '/R2C2_Consensus.fasta', 'a')
-                final_out.write('>' + name + '_' \
-                                + str(round(average_quals, 2)) + '_' \
-                                + str(seq_length) + '_' + str(repeats) \
-                                + '_' + str(len(final_consensus)))
-                final_out.write('\n' + final_consensus + '\n')
-                final_out.close()
-                os.system('rm -r ' + temp_folder + '/*')
-
-def main():
-    '''Controls the flow of the program'''
-    print(input_file)
-
-    pool = mp.Pool(processes=numThreads)
-    read_list = read_fastq_file(input_file)
+    pool = mp.Pool(args.numThreads)
     iteration = 1
-    for step in range(0, len(read_list), groupSize):
+    pbar = tqdm(total=total_reads//args.groupSize+1)
+    for step in range(0, total_reads, args.groupSize):
         interval1 = step
-        interval2 = min(len(read_list), step+groupSize)
-        pool.apply_async(analyze_reads, [read_list[interval1:interval2], iteration])
+        interval2 = min(total_reads, step+args.groupSize)
+
+        pool.apply_async(analyze_reads, \
+            args=(args, read_list[interval1:interval2], splint_dict, adapter_dict, adapter_set, iteration, racon,), \
+            callback=lambda _: pbar.update(1) \
+        )
         iteration += 1
     pool.close()
     pool.join()
+    pbar.close()
 
-    final_fasta = path + '/' + sample + '_Consensus.fasta'
-    final_subreads = path + '/' + sample + '_Subreads.fastq'
-    for i in range(1, iteration):
-        sub_folder = path + '/tmp' + str(i)
-        sub_fasta = sub_folder + '/R2C2_Consensus.fasta'
-        sub_subreads = sub_folder + '/subreads.fastq'
-        os.system('cat %s >>%s' %(sub_fasta, final_fasta))
-        os.system('cat %s >>%s' %(sub_subreads, final_subreads))
-
-    # total = good[0] + bad[0] + zero[0]
-    # sys.stderr.write("Consensus reads: {0}\t({1:.2f}%)\n".format(good[0], good[0]/total*100))
-    # sys.stderr.write("Zero repeat reads: {0}\t({1:.2f}%)\n".format(zero[0], zero[0]/total*100))
-    # sys.stderr.write("Non-consensus reads: {0}\t({1:.2f}%)\n".format(bad[0], bad[0]/total*100))
+    for adapter in adapter_set:
+        os.system('cat {adapter_dir} >{cons}'.format(
+                adapter_dir=args.out_path + adapter + '/tmp*/R2C2_Consensus.fasta',
+                cons=args.out_path + adapter + '/R2C2_Consensus.fasta')
+        )
+        os.system('cat {adapter_dir} >{subreads}'.format(
+                adapter_dir=args.out_path + adapter + '/tmp*/subreads.fastq',
+                subreads=args.out_path + adapter + '/R2C2_Subreads.fastq')
+        )
+        os.system('rm -rf {tmps}'.format(tmps=args.out_path + adapter + '/tmp*'))
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    mp.set_start_method("spawn")
+    main(args)
