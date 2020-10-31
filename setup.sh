@@ -12,20 +12,16 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 cd $cwd
 
-echo 'poaV2'
-git clone https://github.com/tanghaibao/bio-pipeline.git
-cd bio-pipeline/poaV2/
-make poa
-cd $cwd
+echo 'pyabpoa'
+pip3 install --user pyabpoa
 
-echo 'minimap2'
-git clone https://github.com/lh3/minimap2
-cd minimap2 && make
-cd $cwd
+echo 'mappy'
+pip3 install --user mappy
 
-echo 'gonk'
-git clone https://github.com/rvolden/gonk
-cd gonk && make
+echo 'conk'
+python3 -m pip install --user --upgrade wheel setuptools Cython
+git clone https://github.com/rvolden/conk
+cd conk && make
 cd $cwd
 
 echo 'Done'
