@@ -18,8 +18,8 @@ It should be noted that this version is very memory intensive, which may change 
 - [racon](https://github.com/isovic/racon)
 - [blat source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or [blat executable](http://hgdownload.soe.ucsc.edu/admin/exe/)
 
-To fetch and build dependencies, use setup.sh.<br>
-setup.sh will download and make the packages that you need to run C3POa (except for blat).<br>
+To fetch and build dependencies, use setup.sh.
+setup.sh will download and make the packages that you need to run C3POa (except for blat).
 You don't need to have these in your PATH, but if you don't, you'll need to use a [config file](example_config).
 The setup script **does not** install programs or add them to your path.
 If you use the setup script, you still need to put the paths into a config file (for blat and racon).
@@ -28,6 +28,12 @@ If you use the setup script, you still need to put the paths into a config file 
 chmod +x setup.sh
 ./setup.sh
 ```
+
+Alteratively, you can grab all of the pip installable packages:
+```bash
+python3 -m pip install --user --upgrade scipy numpy pyabpoa mappy Cython tqdm setuptools wheel
+```
+and then build conk and racon manually.
 
 Blat can built from [source](https://users.soe.ucsc.edu/~kent/src/blatSrc35.zip) or you can get an [executable](http://hgdownload.soe.ucsc.edu/admin/exe/).
 Please follow the documentation in the blat readme for make instructions.
