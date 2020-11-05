@@ -1,6 +1,7 @@
 # C3POa
 
 [![Github release](https://img.shields.io/github/tag/rvolden/C3POa.svg?label=Version)](https://github.com/rvolden/C3POa/tags)
+[![Published in PNAS](https://img.shields.io/badge/Published%20in-PNAS-blue.svg)](https://doi.org/10.1073/pnas.1806447115)
 [![GPL license](https://img.shields.io/badge/License-GPL-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
 
 C3POa (**C**oncatemeric **C**onsensus **C**aller with **P**artial **O**rder **a**lignments) is a computational pipeline for calling consensi on R2C2 nanopore data.
