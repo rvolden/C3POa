@@ -29,18 +29,18 @@ def parse_args():
     required.add_argument('--splint_file', '-s', type=str, action='store', required=True,
                         help='Path to the splint FASTA file.')
     parser.add_argument('--out_path', '-o', type=str, action='store', default=os.getcwd(),
-                        help='Directory where all the files will end up.\
-                              Defaults to your current directory.')
+                        help='''Directory where all the files will end up.
+                                Defaults to your current directory.''')
     parser.add_argument('--config', '-c', type=str, action='store', default='',
-                        help='If you want to use a config file to specify paths to\
-                              programs, specify them here. Use for racon and blat\
-                              if they are not in your path.')
+                        help='''If you want to use a config file to specify paths to
+                                programs, specify them here. Use for racon and blat
+                                if they are not in your path.''')
     parser.add_argument('--lencutoff', '-l', type=int, action='store', default=1000,
-                        help='Sets the length cutoff for your raw sequences. Anything\
-                              shorter than the cutoff will be excluded. Defaults to 1000.')
+                        help='''Sets the length cutoff for your raw sequences. Anything
+                                shorter than the cutoff will be excluded. Defaults to 1000.''')
     parser.add_argument('--mdistcutoff', '-d', type=int, action='store', default=500,
-                        help='Sets the median distance cutoff for consensus sequences.\
-                              Anything shorter will be excluded. Defaults to 500.')
+                        help='''Sets the median distance cutoff for consensus sequences.
+                                Anything shorter will be excluded. Defaults to 500.''')
     parser.add_argument('--zero', '-z', action='store_false', default=True,
                         help='Use to exclude zero repeat reads. Defaults to True (includes zero repeats).')
     parser.add_argument('--numThreads', '-n', type=int, default=1,
@@ -146,9 +146,14 @@ def main(args):
         os.mkdir(args.out_path)
     log_file = open(args.out_path + 'c3poa.log', 'w+')
 
-    progs = configReader(args.out_path, args.config)
-    racon = progs['racon']
-    blat = progs['blat']
+    if args.config:
+        progs = configReader(args.out_path, args.config)
+        racon = progs['racon']
+        blat = progs['blat']
+    else:
+        racon = 'racon'
+        blat = 'blat'
+
     tmp_dir = args.out_path + 'tmp/'
     if not os.path.isdir(tmp_dir):
         os.mkdir(tmp_dir)
