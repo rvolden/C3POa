@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Roger Volden and Chris Vollmers
-# Last updated: 22 May 2018
 
 import sys
 import os
 import argparse
+import mappy as mm
 
-def argParser():
+def parse_args():
     '''Parses arguments.'''
     parser = argparse.ArgumentParser(description = '',
                                      add_help = True,
@@ -29,26 +29,19 @@ def argParser():
     parser.add_argument('--trim', '-t', action='store_true',
                         help='Use this flag to trim the adapters off the ends of \
                               your sequences.')
+    parser.add_argument('--barcoded', '-b', action='store_true', default=False,
+                        help='Use if postprocessing 10x reads. Produces a separate \
+                              file with 10x barcode sequences')
+    return parser.parse_args()
 
-    return vars(parser.parse_args())
-
-args = argParser()
-output_path = args['output_path'] + '/'
-input_file = args['input_fasta_file']
-adapter_file = args['adapter_file']
-undirectional = args['undirectional']
-trim = args['trim']
-
-def configReader(configIn):
-    '''Parses the config file.'''
+def configReader(path, configIn):
     progs = {}
-    for line in open(configIn):
-        if line.startswith('#') or not line.rstrip().split():
-            continue
-        line = line.rstrip().split('\t')
-        progs[line[0]] = line[1]
-    # should have minimap, poa, racon, gonk, consensus
-    # check for extra programs that shouldn't be there
+    with open(configIn) as f:
+        for line in f:
+            if line.startswith('#') or not line.rstrip().split():
+                continue
+            line = line.rstrip().split('\t')
+            progs[line[0]] = line[1]
     possible = set(['racon', 'blat'])
     inConfig = set()
     for key in progs.keys():
@@ -56,62 +49,36 @@ def configReader(configIn):
     # check for missing programs
     # if missing, default to path
     for missing in possible-inConfig:
-        if missing == 'consensus':
-            path = 'consensus.py'
-        else:
-            path = missing
+        path = missing
         progs[missing] = path
         sys.stderr.write('Using ' + str(missing)
                          + ' from your path, not the config file.\n')
     return progs
 
-if args['config'] or args['c']:
-    progs = configReader(args['config'])
-    blat = progs['blat']
-else:
-    blat = 'blat'
-
 def read_fasta(inFile):
     '''Reads in FASTA files, returns a dict of header:sequence'''
     readDict = {}
-    for line in open(inFile):
-        line = line.rstrip()
-        if not line:
-            continue
-        if line.startswith('>'):
-            if readDict:
-                readDict[lastHead] = ''.join(readDict[lastHead])
-            readDict[line[1:]] = []
-            lastHead = line[1:]
-        else:
-            readDict[lastHead].append(line)
-    if readDict:
-        readDict[lastHead] = ''.join(readDict[lastHead])
+    for read in mm.fastx_read(inFile, read_comment=False):
+        readDict[read[0]] = read[1]
     return readDict
 
-def reverse_complement(sequence):
-    '''Returns the reverse complement of a sequence'''
-    bases = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N', '-':'-'}
-    return ''.join([bases[x] for x in list(sequence)])[::-1]
-
-def run_blat(path, infile, adapter_fasta):
-    os.system('%s -noHead -stepSize=1 -tileSize=6 -t=DNA q=DNA -minScore=10 \
-              -minIdentity=10 -minMatch=1 -oneOff=1 \
-              %s %s %s/Adapter_to_consensus_alignment.psl' \
-              %(blat,adapter_fasta,infile,path))
+def run_blat(path, infile, adapter_fasta, blat):
+    align_psl = path + 'adapter_to_consensus_alignment.psl'
+    os.system('{blat} -noHead -stepSize=1 -tileSize=6 -t=DNA -q=DNA -minScore=10 \
+              -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl}'\
+              .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl))
 
 def parse_blat(path, reads):
     adapter_dict, iterator = {}, 0
 
-    for name,sequence in reads.items():
-
+    for name, sequence in reads.items():
         adapter_dict[name] = {}
         adapter_dict[name]['+'] = []
         adapter_dict[name]['-'] = []
         adapter_dict[name]['+'].append(('-', 1, 0))
         adapter_dict[name]['-'].append(('-', 1, len(sequence)))
 
-    for line in open(path + '/Adapter_to_consensus_alignment.psl'):
+    for line in open(path + 'adapter_to_consensus_alignment.psl'):
         a = line.strip().split('\t')
         read_name, adapter, strand = a[9], a[13], a[8]
         if int(a[5]) < 50 and float(a[0]) > 10:
@@ -128,10 +95,17 @@ def parse_blat(path, reads):
                                                     position))
     return adapter_dict
 
-def write_fasta_file(path, adapter_dict, reads):
+def write_fasta_file(args, adapter_dict, reads):
+    path = args.output_path
+    undirectional = args.undirectional
+    barcoded = args.barcoded
+
     out = open(path + 'R2C2_full_length_consensus_reads.fasta', 'w')
     out3 = open(path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
     out5 = open(path + 'R2C2_full_length_consensus_reads_right_splint.fasta', 'w')
+    if barcoded:
+        out10X = open(path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta', 'w')
+
     for name, sequence in reads.items():
         adapter_plus = sorted(adapter_dict[name]['+'],
                               key=lambda x: x[2], reverse=False)
@@ -139,6 +113,7 @@ def write_fasta_file(path, adapter_dict, reads):
                               key=lambda x: x[2], reverse=False)
         plus_list_name, plus_list_position = [], []
         minus_list_name, minus_list_position = [], []
+
         for adapter in adapter_plus:
             if adapter[0] != '-':
                 plus_list_name.append(adapter[0])
@@ -148,44 +123,67 @@ def write_fasta_file(path, adapter_dict, reads):
                 minus_list_name.append(adapter[0])
                 minus_list_position.append(adapter[2])
 
-        if len(plus_list_name) == 1 and len(minus_list_name) == 1:
-            if plus_list_position[0] < minus_list_position[0]:
-                seq = sequence[plus_list_position[0]:minus_list_position[0]]
-                ada = sequence[max(plus_list_position[0]-40, 0):minus_list_position[0]+40]
-                name += '_' + str(len(seq))
-                use = False
-                if undirectional:
+        if len(plus_list_name) != 1 or len(minus_list_name) != 1:
+            continue
+        if minus_list_position[0] <= plus_list_position[0]:
+            continue
+
+        use = False
+        if undirectional:
+            direction = '+'
+            use = True
+        else:
+            if plus_list_name[0] != minus_list_name[0]:
+                use = True
+                if plus_list_name[0] == '5Prime_adapter':
                     direction = '+'
-                    use = True
                 else:
-                    if plus_list_name[0] != minus_list_name[0]:
-                        use = True
-                        if plus_list_name[0] == '5Prime_adapter':
-                            direction = '+'
-                        elif plus_list_name[0] == '3Prime_adapter':
-                            direction = '-'
-                if use:
-                    if direction == '+':
-                        if trim:
-                            out.write('>%s\n%s\n' %(name, seq))
-                        else:
-                            out.write('>%s\n%s\n' %(name, ada))
-                        out5.write('>%s\n%s\n' %(name, reverse_complement(sequence[:plus_list_position[0]])))
-                        out3.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
-                    elif direction == '-':
-                        if trim:
-                            out.write('>%s\n%s\n' %(name, reverse_complement(seq)))
-                        else:
-                            out.write('>%s\n%s\n' %(name, reverse_complement(ada)))
-                        out3.write('>%s\n%s\n' %(name, reverse_complement(sequence[:plus_list_position[0]+40])))
-                        out5.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
+                    direction = '-'
+        if not use:
+            continue
 
-def main():
-    reads = read_fasta(input_file)
+        seq = sequence[plus_list_position[0]:minus_list_position[0]]
+        ada = sequence[max(plus_list_position[0]-40, 0):minus_list_position[0]+40]
+        name += '_' + str(len(seq))
+        if direction == '+':
+            if trim:
+                out.write('>%s\n%s\n' %(name, seq))
+            else:
+                out.write('>%s\n%s\n' %(name, ada))
+            out5.write('>%s\n%s\n' %(name, mm.revcomp(sequence[:plus_list_position[0]])))
+            out3.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
+            if barcoded:
+                out10X.write('>%s\n%splus\n' %(name, mm.revcomp(sequence[minus_list_position[0]-40:minus_list_position[0]])))
+        elif direction == '-':
+            if trim:
+                out.write('>%s\n%s\n' %(name, mm.revcomp(seq)))
+            else:
+                out.write('>%s\n%s\n' %(name, mm.revcomp(ada)))
+            out3.write('>%s\n%s\n' %(name, mm.revcomp(sequence[:plus_list_position[0]+40])))
+            out5.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
+            if barcoded:
+                out10X.write('>%s\n%sminus\n' %(name, sequence[plus_list_position[0]:plus_list_position[0]+40]))
 
-    run_blat(output_path, input_file, adapter_file)
-    adapter_dict = parse_blat(output_path, reads)
-    write_fasta_file(output_path, adapter_dict, reads)
+def main(args):
+    if not args.output_path.endswith('/'):
+        args.output_path += '/'
+
+    if args.config:
+        progs = configReader(args.output_path, args.config)
+        blat = progs['blat']
+    else:
+        blat = 'blat'
+
+    if args.undirectional and args.barcoded:
+        print('Error: undirectional and barcoded are mutually exclusive.')
+        sys.exit(1)
+
+    reads = read_fasta(args.input_fasta_file)
+
+    run_blat(args.output_path, args.input_fasta_file, args.adapter_file, blat)
+    adapter_dict = parse_blat(args.output_path, reads)
+    write_fasta_file(args, adapter_dict, reads)
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    main(args)
