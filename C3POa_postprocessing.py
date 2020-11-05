@@ -49,12 +49,10 @@ def configReader(configIn):
         progs[line[0]] = line[1]
     # should have minimap, poa, racon, gonk, consensus
     # check for extra programs that shouldn't be there
-    possible = set(['poa', 'minimap2', 'gonk', 'consensus', 'racon', 'blat'])
+    possible = set(['racon', 'blat'])
     inConfig = set()
     for key in progs.keys():
         inConfig.add(key)
-        # if key not in possible:
-        #     raise Exception('Check config file')
     # check for missing programs
     # if missing, default to path
     for missing in possible-inConfig:
