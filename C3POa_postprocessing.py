@@ -5,6 +5,7 @@ import sys
 import os
 import argparse
 import mappy as mm
+from tqdm import tqdm
 
 def parse_args():
     '''Parses arguments.'''
@@ -106,7 +107,7 @@ def write_fasta_file(args, adapter_dict, reads):
     if barcoded:
         out10X = open(path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta', 'w')
 
-    for name, sequence in reads.items():
+    for name, sequence in tqdm(reads.items()):
         adapter_plus = sorted(adapter_dict[name]['+'],
                               key=lambda x: x[2], reverse=False)
         adapter_minus = sorted(adapter_dict[name]['-'],
