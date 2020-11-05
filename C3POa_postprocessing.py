@@ -104,6 +104,7 @@ def write_fasta_file(args, adapter_dict, reads):
     path = args.output_path
     undirectional = args.undirectional
     barcoded = args.barcoded
+    trim = args.trim
 
     out = open(path + 'R2C2_full_length_consensus_reads.fasta', 'w')
     out3 = open(path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
