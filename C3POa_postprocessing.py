@@ -65,9 +65,13 @@ def read_fasta(inFile):
 
 def run_blat(path, infile, adapter_fasta, blat):
     align_psl = path + 'adapter_to_consensus_alignment.psl'
-    os.system('{blat} -noHead -stepSize=1 -tileSize=6 -t=DNA -q=DNA -minScore=10 \
-              -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl}'\
-              .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl))
+    if not os.path.exists(align_psl) or os.stat(align_psl).st_size == 0:
+        print('Aligning splints to reads with blat', file=sys.stderr)
+        os.system('{blat} -noHead -stepSize=1 -tileSize=6 -t=DNA -q=DNA -minScore=10 \
+                  -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl}'\
+                  .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl))
+    else:
+        print('Reading existing psl file', file=sys.stderr)
 
 def parse_blat(path, reads):
     adapter_dict, iterator = {}, 0
