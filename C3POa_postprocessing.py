@@ -62,10 +62,9 @@ def configReader(path, configIn):
 def get_file_len(inFile):
     '''Figure out how many reads for best chunk size for parallelization'''
     count = 0
-    with open(inFile) as f:
-        for _ in f:
-            count += 1
-    return int(count/2)
+    for _ in mm.fastx_read(inFile, read_comment=False):
+        count += 1
+    return count
 
 def process(args, reads, blat, iteration):
     tmp_dir = args.output_path + 'post_tmp_' + str(iteration) + '/'
@@ -89,37 +88,39 @@ def chunk_process(num_reads, args, blat):
 
     pool = mp.Pool(args.threads)
     pbar = tqdm(total=args.threads)
-    iteration, current_num, tmp_reads = 1, 0, {}
+    iteration, current_num, tmp_reads, target = 1, 0, {}, chunk_size
     for read in mm.fastx_read(args.input_fasta_file, read_comment=False):
         tmp_reads[read[0]] = read[1]
         current_num += 1
-        if current_num == chunk_size:
+        if current_num == target:
             pool.apply_async(process, args=(args, tmp_reads, blat, iteration), callback=lambda _: pbar.update(1))
-            current_num, tmp_reads = 0, {}
             iteration += 1
+            target = chunk_size*iteration
+            if target >= num_reads:
+                target = num_reads
+            tmp_reads = {}
     pool.close()
     pool.join()
     pbar.close()
 
-    for tmp in range(1, iteration):
-        os.system('cat {flc} >{flc_final}'.format(
-                flc=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads.fasta',
-                flc_final=args.output_path + '/R2C2_full_length_consensus_reads.fasta')
+    os.system('cat {flc} >{flc_final}'.format(
+            flc=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads.fasta',
+            flc_final=args.output_path + '/R2C2_full_length_consensus_reads.fasta')
+    )
+    os.system('cat {flc_left} >{flc_left_final}'.format(
+            flc_left=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads_left_splint.fasta',
+            flc_left_final=args.output_path + '/R2C2_full_length_consensus_reads_left_splint.fasta')
+    )
+    os.system('cat {flc_right} >{flc_right_final}'.format(
+            flc_right=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads_right_splint.fasta',
+            flc_right_final=args.output_path + '/R2C2_full_length_consensus_reads_right_splint.fasta')
+    )
+    if args.barcoded:
+        os.system('cat {flc_bc} >{flc_bc_final}'.format(
+                flc_bc=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads_10X_sequences.fasta',
+                flc_bc_final=args.output_path + '/R2C2_full_length_consensus_reads_10X_sequences.fasta')
         )
-        os.system('cat {flc_left} >{flc_left_final}'.format(
-                flc_left=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads_left_splint.fasta',
-                flc_left_final=args.output_path + '/R2C2_full_length_consensus_reads_left_splint.fasta')
-        )
-        os.system('cat {flc_right} >{flc_right_final}'.format(
-                flc_right=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads_right_splint.fasta',
-                flc_right_final=args.output_path + '/R2C2_full_length_consensus_reads_right_splint.fasta')
-        )
-        if args.barcoded:
-            os.system('cat {flc_bc} >{flc_bc_final}'.format(
-                    flc_bc=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads_10X_sequences.fasta',
-                    flc_bc_final=args.output_path + '/R2C2_full_length_consensus_reads_10X_sequences.fasta')
-            )
-        os.system('rm -rf {tmps}'.format(tmps=args.output_path + 'tmp_post*'))
+    os.system('rm -rf {tmps}'.format(tmps=args.output_path + 'post_tmp*'))
 
 def read_fasta(inFile):
     '''Reads in FASTA files, returns a dict of header:sequence'''
@@ -132,8 +133,8 @@ def run_blat(path, infile, adapter_fasta, blat):
     align_psl = path + 'adapter_to_consensus_alignment.psl'
     if not os.path.exists(align_psl) or os.stat(align_psl).st_size == 0:
         os.system('{blat} -noHead -stepSize=1 -tileSize=6 -t=DNA -q=DNA -minScore=10 \
-                  -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl}'\
-                  .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl))
+                  -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl} >{blat_msgs}'\
+                  .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl, blat_msgs=path+'blat_msgs.log'))
     else:
         print('Reading existing psl file', file=sys.stderr)
 
@@ -176,7 +177,7 @@ def write_fasta_file(args, path, adapter_dict, reads):
     if barcoded:
         out10X = open(path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta', 'w')
 
-    for name, sequence in tqdm(reads.items()):
+    for name, sequence in (tqdm(reads.items()) if args.threads==1  else reads.items()):
         adapter_plus = sorted(adapter_dict[name]['+'],
                               key=lambda x: x[2], reverse=False)
         adapter_minus = sorted(adapter_dict[name]['-'],
