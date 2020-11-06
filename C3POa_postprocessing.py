@@ -6,6 +6,7 @@ import os
 import argparse
 import mappy as mm
 from tqdm import tqdm
+import multiprocessing as mp
 
 def parse_args():
     '''Parses arguments.'''
@@ -33,6 +34,8 @@ def parse_args():
     parser.add_argument('--barcoded', '-b', action='store_true', default=False,
                         help='Use if postprocessing 10x reads. Produces a separate \
                               file with 10x barcode sequences')
+    parser.add_argument('--threads', '-n', type=int, default=1,
+                        help='Number of threads to use during multiprocessing. Defaults to 1.')
     return parser.parse_args()
 
 def configReader(path, configIn):
@@ -56,6 +59,68 @@ def configReader(path, configIn):
                          + ' from your path, not the config file.\n')
     return progs
 
+def get_file_len(inFile):
+    '''Figure out how many reads for best chunk size for parallelization'''
+    count = 0
+    with open(inFile) as f:
+        for _ in f:
+            count += 1
+    return int(count/2)
+
+def process(args, reads, blat, iteration):
+    tmp_dir = args.output_path + 'post_tmp_' + str(iteration) + '/'
+    if not os.path.isdir(tmp_dir):
+        os.mkdir(tmp_dir)
+    tmp_fa = tmp_dir + 'tmp_for_blat.fasta'
+    tmp_fa_fh = open(tmp_fa, 'w+')
+    for header, seq in reads.items():
+        print('>' + header, file=tmp_fa_fh)
+        print(seq, file=tmp_fa_fh)
+    tmp_fa_fh.close()
+
+    run_blat(tmp_dir, tmp_fa, args.adapter_file, blat)
+    os.remove(tmp_fa)
+    adapter_dict = parse_blat(tmp_dir, reads)
+    write_fasta_file(args, tmp_dir, adapter_dict, reads)
+
+def chunk_process(num_reads, args, blat):
+    '''Split the input fasta into chunks and process'''
+    chunk_size = (num_reads//args.threads) + 1
+
+    pool = mp.Pool(args.threads)
+    pbar = tqdm(total=args.threads)
+    iteration, current_num, tmp_reads = 1, 0, {}
+    for read in mm.fastx_read(args.input_fasta_file, read_comment=False):
+        tmp_reads[read[0]] = read[1]
+        current_num += 1
+        if current_num == chunk_size:
+            pool.apply_async(process, args=(args, tmp_reads, blat, iteration), callback=lambda _: pbar.update(1))
+            current_num, tmp_reads = 0, {}
+            iteration += 1
+    pool.close()
+    pool.join()
+    pbar.close()
+
+    for tmp in range(1, iteration):
+        os.system('cat {flc} >{flc_final}'.format(
+                flc=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads.fasta',
+                flc_final=args.output_path + '/R2C2_full_length_consensus_reads.fasta')
+        )
+        os.system('cat {flc_left} >{flc_left_final}'.format(
+                flc_left=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads_left_splint.fasta',
+                flc_left_final=args.output_path + '/R2C2_full_length_consensus_reads_left_splint.fasta')
+        )
+        os.system('cat {flc_right} >{flc_right_final}'.format(
+                flc_right=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads_right_splint.fasta',
+                flc_right_final=args.output_path + '/R2C2_full_length_consensus_reads_right_splint.fasta')
+        )
+        if args.barcoded:
+            os.system('cat {flc_bc} >{flc_bc_final}'.format(
+                    flc_bc=args.output_path + 'tmp_post*/R2C2_full_length_consensus_reads_10X_sequences.fasta',
+                    flc_bc_final=args.output_path + '/R2C2_full_length_consensus_reads_10X_sequences.fasta')
+            )
+        os.system('rm -rf {tmps}'.format(tmps=args.output_path + 'tmp_post*'))
+
 def read_fasta(inFile):
     '''Reads in FASTA files, returns a dict of header:sequence'''
     readDict = {}
@@ -66,7 +131,6 @@ def read_fasta(inFile):
 def run_blat(path, infile, adapter_fasta, blat):
     align_psl = path + 'adapter_to_consensus_alignment.psl'
     if not os.path.exists(align_psl) or os.stat(align_psl).st_size == 0:
-        print('Aligning splints to reads with blat', file=sys.stderr)
         os.system('{blat} -noHead -stepSize=1 -tileSize=6 -t=DNA -q=DNA -minScore=10 \
                   -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl}'\
                   .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl))
@@ -83,25 +147,25 @@ def parse_blat(path, reads):
         adapter_dict[name]['+'].append(('-', 1, 0))
         adapter_dict[name]['-'].append(('-', 1, len(sequence)))
 
-    for line in open(path + 'adapter_to_consensus_alignment.psl'):
-        a = line.strip().split('\t')
-        read_name, adapter, strand = a[9], a[13], a[8]
-        if int(a[5]) < 50 and float(a[0]) > 10:
-            if strand == '+':
-                  start = int(a[11]) - int(a[15])
-                  end = int(a[12]) + (int(a[14]) - int(a[16]))
-                  position = end
-            if strand == '-':
-                  start = int(a[11]) - (int(a[14]) - int(a[16]))
-                  end = int(a[12]) + int(a[15])
-                  position = start
-            adapter_dict[read_name][strand].append((adapter,
-                                                    float(a[0]),
-                                                    position))
+    with open(path + 'adapter_to_consensus_alignment.psl') as f:
+        for line in f:
+            a = line.strip().split('\t')
+            read_name, adapter, strand = a[9], a[13], a[8]
+            if int(a[5]) < 50 and float(a[0]) > 10:
+                if strand == '+':
+                      start = int(a[11]) - int(a[15])
+                      end = int(a[12]) + (int(a[14]) - int(a[16]))
+                      position = end
+                if strand == '-':
+                      start = int(a[11]) - (int(a[14]) - int(a[16]))
+                      end = int(a[12]) + int(a[15])
+                      position = start
+                adapter_dict[read_name][strand].append((adapter,
+                                                        float(a[0]),
+                                                        position))
     return adapter_dict
 
-def write_fasta_file(args, adapter_dict, reads):
-    path = args.output_path
+def write_fasta_file(args, path, adapter_dict, reads):
     undirectional = args.undirectional
     barcoded = args.barcoded
     trim = args.trim
@@ -169,6 +233,11 @@ def write_fasta_file(args, adapter_dict, reads):
             out5.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
             if barcoded:
                 out10X.write('>%s\n%sminus\n' %(name, sequence[plus_list_position[0]:plus_list_position[0]+40]))
+    out.close()
+    out3.close()
+    out5.close()
+    if barcoded:
+        out10X.close()
 
 def main(args):
     if not args.output_path.endswith('/'):
@@ -184,11 +253,14 @@ def main(args):
         print('Error: undirectional and barcoded are mutually exclusive.')
         sys.exit(1)
 
-    reads = read_fasta(args.input_fasta_file)
-
-    run_blat(args.output_path, args.input_fasta_file, args.adapter_file, blat)
-    adapter_dict = parse_blat(args.output_path, reads)
-    write_fasta_file(args, adapter_dict, reads)
+    if args.threads > 1:
+        num_reads = get_file_len(args.input_fasta_file)
+        chunk_process(num_reads, args, blat)
+    else:
+        reads = read_fasta(args.input_fasta_file)
+        run_blat(args.output_path, args.input_fasta_file, args.adapter_file, blat)
+        adapter_dict = parse_blat(args.output_path, reads)
+        write_fasta_file(args, args.output_path, adapter_dict, reads)
 
 if __name__ == '__main__':
     args = parse_args()
