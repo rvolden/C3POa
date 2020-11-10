@@ -20,6 +20,10 @@ def preprocess(blat, out_dir, tmp_dir, reads, splint_file, tmp_adapter_dict):
     else:
         print('Reading existing psl file', file=sys.stderr)
 
+    '''
+    Implement thread pool here
+    '''
+
     adapter_set = set()
     with open(align_psl) as f:
         for line in f:

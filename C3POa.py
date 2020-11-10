@@ -163,6 +163,21 @@ def main(args):
     short_reads = 0
     tmp_fasta = tmp_dir + 'R2C2_temp_for_BLAT.fasta'
     align_psl = tmp_dir + 'splint_to_read_alignments.psl'
+
+    '''
+    Workflow for blat parallelization:
+        If the psl file exists, don't parallelize and set make_tmp_fasta to false
+
+        else:
+            use the same chunking method from postprocessing to make the input
+            fasta files for blat (just like what we're doing now), but the chunks
+            will be bigger.
+
+            Implement the mp pool in preprocess.py
+            after, cat all of the output psl files into a master psl file
+            from there, read in that master psl (what's already implemented)
+    '''
+
     make_tmp_fasta, tmp_adapter_dict = False, {}
     if not os.path.exists(align_psl) or os.stat(align_psl).st_size == 0:
         make_tmp_fasta = True
