@@ -166,6 +166,27 @@ def parse_blat(path, reads):
                                                         position))
     return adapter_dict
 
+def match_index(sequence,sequence_to_index):
+    dist_dict={}
+    dist_list=[]
+    for position in range(0,len(sequence),1):
+        for index_sequence,index in sequence_to_index.items():
+            if index not in dist_dict:
+                dist_dict[index]=[]
+            query=sequence[position:position+len(index_sequence)]
+            if len(query)!=len(index_sequence):
+                break
+            else:
+                dist=editdistance.eval(query,index_sequence)
+                dist_dict[index].append(dist)
+    for index,distances in dist_dict.items():
+        dist_list.append((index,min(distances)))
+    dist_list=sorted(dist_list,key=lambda x: x[1])
+    if dist_list[0][1]<2 and dist_list[1][1]-dist_list[0][1]>1:
+        return dist_list[0][0]
+    else:
+        return '-'
+
 def write_fasta_file(args, path, adapter_dict, reads):
     undirectional = args.undirectional
     barcoded = args.barcoded
