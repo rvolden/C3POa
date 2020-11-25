@@ -10,7 +10,7 @@ def call_peaks(scores, min_dist, iters, window, order):
     for i in range(iters):
         scores = savitzky_golay(scores, window, order, deriv=0, rate=1)
     med_score = np.median(scores)
-    if max(scores) < 6*med_score:
+    if max(scores) < 6 * med_score:
         return peaks
-    peaks, _ = find_peaks(scores, distance=min_dist, height=med_score*3)
+    peaks, _ = find_peaks(scores, distance=min_dist, height=med_score * 3)
     return peaks

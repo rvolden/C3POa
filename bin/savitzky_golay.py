@@ -25,14 +25,14 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     if window_size < order + 2:
         raise TypeError("window_size is too small for the polynomials order")
     order_range = range(order + 1)
-    half = (window_size -1) // 2
+    half = (window_size - 1) // 2
     # precompute coefficients
     b = np.mat([[k**i for i in order_range] for k in range(-half, half + 1)])
     m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
     # pad the signal at the extremes with values taken from the signal itself
-    firstvals = y[0] - np.abs( y[1:half+1][::-1] - y[0] )
-    lastvals = y[-1] + np.abs(y[-half-1:-1][::-1] - y[-1])
+    firstvals = y[0] - np.abs(y[1:half + 1][::-1] - y[0])
+    lastvals = y[-1] + np.abs(y[-half - 1:-1][::-1] - y[-1])
     y = np.concatenate((firstvals, y, lastvals))
     filtered = np.convolve(m[::-1], y, mode='valid')
 
-    return np.convolve(m[::-1], y, mode='valid')
+    return filtered

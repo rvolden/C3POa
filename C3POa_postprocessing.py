@@ -10,9 +10,9 @@ import multiprocessing as mp
 
 def parse_args():
     '''Parses arguments.'''
-    parser = argparse.ArgumentParser(description = '',
-                                     add_help = True,
-                                     prefix_chars = '-')
+    parser = argparse.ArgumentParser(description='',
+                                     add_help=True,
+                                     prefix_chars='-')
     parser.add_argument('--input_fasta_file', '-i', type=str)
     parser.add_argument('--output_path', '-o', type=str)
     parser.add_argument('--adapter_file', '-a', type=str)
@@ -20,7 +20,7 @@ def parse_args():
                         help='If you want to use a config file to specify paths to\
                               programs, specify them here. Use for poa, racon, water,\
                               blat, and minimap2 if they are not in your path.')
-    parser.add_argument('--undirectional','-u', action='store_true',
+    parser.add_argument('--undirectional', '-u', action='store_true',
                         help='By default, your cDNA molecules are assumed to be \
                               directional with two sequences named "3Prime_adapter" \
                               and "5Prime_adapter" expected in your adapter_file in \
@@ -84,7 +84,7 @@ def process(args, reads, blat, iteration):
 
 def chunk_process(num_reads, args, blat):
     '''Split the input fasta into chunks and process'''
-    chunk_size = (num_reads//args.threads) + 1
+    chunk_size = (num_reads // args.threads) + 1
 
     pool = mp.Pool(args.threads)
     pbar = tqdm(total=args.threads)
@@ -95,7 +95,7 @@ def chunk_process(num_reads, args, blat):
         if current_num == target:
             pool.apply_async(process, args=(args, tmp_reads, blat, iteration), callback=lambda _: pbar.update(1))
             iteration += 1
-            target = chunk_size*iteration
+            target = chunk_size * iteration
             if target >= num_reads:
                 target = num_reads
             tmp_reads = {}
@@ -133,8 +133,8 @@ def run_blat(path, infile, adapter_fasta, blat):
     align_psl = path + 'adapter_to_consensus_alignment.psl'
     if not os.path.exists(align_psl) or os.stat(align_psl).st_size == 0:
         os.system('{blat} -noHead -stepSize=1 -tileSize=6 -t=DNA -q=DNA -minScore=10 \
-                  -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl} >{blat_msgs}'\
-                  .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl, blat_msgs=path+'blat_msgs.log'))
+                  -minIdentity=10 -minMatch=1 -oneOff=1 {adapters} {reads} {psl} >{blat_msgs}'
+                  .format(blat=blat, adapters=adapter_fasta, reads=infile, psl=align_psl, blat_msgs=path + 'blat_msgs.log'))
     else:
         print('Reading existing psl file', file=sys.stderr)
 
@@ -154,35 +154,35 @@ def parse_blat(path, reads):
             read_name, adapter, strand = a[9], a[13], a[8]
             if int(a[5]) < 50 and float(a[0]) > 10:
                 if strand == '+':
-                      start = int(a[11]) - int(a[15])
-                      end = int(a[12]) + (int(a[14]) - int(a[16]))
-                      position = end
+                    start = int(a[11]) - int(a[15])
+                    end = int(a[12]) + (int(a[14]) - int(a[16]))
+                    position = end
                 if strand == '-':
-                      start = int(a[11]) - (int(a[14]) - int(a[16]))
-                      end = int(a[12]) + int(a[15])
-                      position = start
+                    start = int(a[11]) - (int(a[14]) - int(a[16]))
+                    end = int(a[12]) + int(a[15])
+                    position = start
                 adapter_dict[read_name][strand].append((adapter,
                                                         float(a[0]),
                                                         position))
     return adapter_dict
 
 def match_index(sequence,sequence_to_index):
-    dist_dict={}
-    dist_list=[]
-    for position in range(0,len(sequence),1):
-        for index_sequence,index in sequence_to_index.items():
+    dist_dict = {}
+    dist_list = []
+    for position in range(len(sequence)):
+        for index_sequence, index in sequence_to_index.items():
             if index not in dist_dict:
-                dist_dict[index]=[]
-            query=sequence[position:position+len(index_sequence)]
-            if len(query)!=len(index_sequence):
+                dist_dict[index] = []
+            query = sequence[position:position + len(index_sequence)]
+            if len(query) != len(index_sequence):
                 break
             else:
-                dist=editdistance.eval(query,index_sequence)
+                dist = editdistance.eval(query, index_sequence)
                 dist_dict[index].append(dist)
-    for index,distances in dist_dict.items():
-        dist_list.append((index,min(distances)))
-    dist_list=sorted(dist_list,key=lambda x: x[1])
-    if dist_list[0][1]<2 and dist_list[1][1]-dist_list[0][1]>1:
+    for index, distances in dist_dict.items():
+        dist_list.append((index, min(distances)))
+    dist_list = sorted(dist_list, key=lambda x: x[1])
+    if dist_list[0][1] < 2 and dist_list[1][1] - dist_list[0][1] > 1:
         return dist_list[0][0]
     else:
         return '-'

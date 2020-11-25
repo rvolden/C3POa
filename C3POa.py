@@ -10,7 +10,7 @@ import mappy as mm
 from conk import conk
 from tqdm import tqdm
 
-path = '/'.join(os.path.realpath(__file__).split('/')[:-1])+'/bin/'
+path = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/bin/'
 sys.path.append(os.path.abspath(path))
 
 from preprocess import preprocess
@@ -19,15 +19,15 @@ from determine_consensus import determine_consensus
 
 def parse_args():
     '''Parses arguments.'''
-    parser = argparse.ArgumentParser(description = 'Makes consensus sequences \
+    parser = argparse.ArgumentParser(description='Makes consensus sequences \
                                                     from R2C2 reads.',
-                                     add_help = True,
-                                     prefix_chars = '-')
+                                     add_help=True,
+                                     prefix_chars='-')
     required = parser.add_argument_group('required arguments')
     required.add_argument('--reads', '-r', type=str, action='store', required=True,
                           help='FASTQ file that contains the long R2C2 reads.')
     required.add_argument('--splint_file', '-s', type=str, action='store', required=True,
-                        help='Path to the splint FASTA file.')
+                          help='Path to the splint FASTA file.')
     parser.add_argument('--out_path', '-o', type=str, action='store', default=os.getcwd(),
                         help='''Directory where all the files will end up.
                                 Defaults to your current directory.''')
@@ -63,7 +63,7 @@ def configReader(path, configIn):
         inConfig.add(key)
     # check for missing programs
     # if missing, default to path
-    for missing in possible-inConfig:
+    for missing in possible - inConfig:
         path = missing
         progs[missing] = path
         sys.stderr.write('Using ' + str(missing)
@@ -72,7 +72,7 @@ def configReader(path, configIn):
 
 def rounding(x, base):
     '''Rounds to the nearest base, we use 50'''
-    return int(base * round(float(x)/base))
+    return int(base * round(float(x) / base))
 
 def analyze_reads(args, reads, splint_dict, adapter_dict, adapter_set, iteration, racon):
     penalty, iters, window, order = 20, 3, 41, 2
@@ -91,8 +91,8 @@ def analyze_reads(args, reads, splint_dict, adapter_dict, adapter_set, iteration
         peaks = call_peaks(scores, args.mdistcutoff, iters, window, order)
         if not list(peaks):
             continue
-        peaks = list(peaks + len(splint)//2)
-        for i in range(len(peaks)-1, -1, -1):
+        peaks = list(peaks + len(splint) // 2)
+        for i in range(len(peaks) - 1, -1, -1):
             if peaks[i] >= seq_len:
                 del peaks[i]
         if not peaks:
@@ -203,7 +203,7 @@ def main(args):
     print('Under len cutoff:', short_reads, file=log_file)
     print('Total thrown away reads:', short_reads + no_splint, file=log_file)
     log_file.close()
- 
+
     splint_dict = {}
     for splint in mm.fastx_read(args.splint_file, read_comment=False):
         splint_dict[splint[0]] = [splint[1]]
@@ -216,9 +216,9 @@ def main(args):
         interval1 = step
         interval2 = min(total_reads, step+args.groupSize)
 
-        pool.apply_async(analyze_reads, \
-            args=(args, read_list[interval1:interval2], splint_dict, adapter_dict, adapter_set, iteration, racon,), \
-            callback=lambda _: pbar.update(1) \
+        pool.apply_async(analyze_reads,
+            args=(args, read_list[interval1:interval2], splint_dict, adapter_dict, adapter_set, iteration, racon,),
+            callback=lambda _: pbar.update(1)
         )
         iteration += 1
     pool.close()

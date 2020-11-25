@@ -35,9 +35,9 @@ def consensus(sequences, qualityDict):
             except IndexError: # if gap at end
                 gapLen = 1
             if avgQual(seqAqual, i, gapLen) > avgQual(seqBqual, i, gapLen):
-                consensus += seqA[i:i+gapLen]
+                consensus += seqA[i:i + gapLen]
             else:
-                consensus += seqB[i:i+gapLen]
+                consensus += seqB[i:i + gapLen]
             i += gapLen
             continue
         i += 1
@@ -45,7 +45,7 @@ def consensus(sequences, qualityDict):
 
 def avgQual(qual, i, gapLen):
     '''Returns average quality of a segment.'''
-    return sum(ord(x) for x in list(qual[i:i+gapLen]))/gapLen
+    return sum(ord(x) for x in list(qual[i:i + gapLen])) / gapLen
 
 def normalizeLen(seq, quality):
     '''
@@ -68,7 +68,7 @@ def normalizeLen(seq, quality):
             seqIndex += 1
     if len(seq) != len(newQuality):
         gapLen = 0
-        while seq[-1-gapLen] == '-':
+        while seq[-1 - gapLen] == '-':
             newQuality += newQuality[-1]
             gapLen += 1
     return newQuality
@@ -79,4 +79,3 @@ def pairwise_consensus(poa_subreads, subreads, sub_quals):
         seqDict[subreads[i]] = sub_quals[i]
     pw_cons = consensus(poa_subreads, seqDict)
     return pw_cons
-

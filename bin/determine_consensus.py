@@ -5,7 +5,6 @@ import pyabpoa as poa
 import mappy as mm
 import os
 import subprocess
-import sys
 from consensus import pairwise_consensus
 
 def determine_consensus(args, read, subreads, sub_qual, racon, tmp_dir, subread_file):
@@ -49,7 +48,7 @@ def determine_consensus(args, read, subreads, sub_qual, racon, tmp_dir, subread_
     abpoa_fasta_fh = open(abpoa_fasta, 'w+')
     print('>{name}\n{seq}\n'.format(name=name, seq=abpoa_cons), file=abpoa_fasta_fh)
     abpoa_fasta_fh.close()
- 
+
     # map each of the subreads to the poa consensus
     mm_align = mm.Aligner(seq=abpoa_cons, preset='map-ont')
     for i in range(repeats):
@@ -58,9 +57,9 @@ def determine_consensus(args, read, subreads, sub_qual, racon, tmp_dir, subread_
         for hit in mm_align.map(subread):
             qname = name + '_subread_' + str(i)
             print("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
-                    qname, str(len(subread)), hit.q_st, hit.q_en,
-                    hit.strand, name, hit.ctg_len, hit.r_st,
-                    hit.r_en, hit.mlen, hit.blen, hit.mapq), file=overlap_fh)
+                qname, str(len(subread)), hit.q_st, hit.q_en,
+                hit.strand, name, hit.ctg_len, hit.r_st,
+                hit.r_en, hit.mlen, hit.blen, hit.mapq), file=overlap_fh)
             print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=subread_fh)
             print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=tmp_subread_fh)
     subread_fh.close()
@@ -73,7 +72,7 @@ def determine_consensus(args, read, subreads, sub_qual, racon, tmp_dir, subread_
 
     # polish poa cons with the subreads
     subprocess.run([racon, tmp_subread_file, overlap_file, abpoa_fasta, '-q', '5', '-t', '1'],
-            stdout=racon_cons_fh, stderr=racon_msgs_fh)
+                   stdout=racon_cons_fh, stderr=racon_msgs_fh)
     racon_cons_fh.close()
     racon_msgs_fh.close()
 
@@ -90,9 +89,9 @@ def zero_repeats(name, seq, qual, subreads, sub_qual, subread_file):
     # subread is the master subread fastq for this group
     subread_fh = open(subread_file, 'a+')
     for i in range(len(subreads)):
-        print('@{name}\n{sub}\n+\n{q}'.format(name=name + '_subread_' + str(i), \
-                                              sub=subreads[i], \
-                                              q=sub_qual[i]), \
+        print('@{name}\n{sub}\n+\n{q}'.format(name=name + '_subread_' + str(i),
+                                              sub=subreads[i],
+                                              q=sub_qual[i]),
                                               file=subread_fh)
     subread_fh.close()
 

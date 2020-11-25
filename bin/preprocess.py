@@ -14,7 +14,7 @@ def preprocess(blat, out_dir, tmp_dir, reads, splint_file, tmp_adapter_dict):
 
         # run blat on all reads to make the psl file
         os.system('{blat} -noHead -stepSize=1 -t=DNA -q=DNA -minScore=15 \
-                  -minIdentity=10 {splint} {reads} {psl}'\
+                  -minIdentity=10 {splint} {reads} {psl}'
                   .format(blat=blat, splint=splint_file, reads=tmp_fasta, psl=align_psl))
         os.remove(tmp_fasta)
     else:
@@ -40,9 +40,9 @@ def preprocess(blat, out_dir, tmp_dir, reads, splint_file, tmp_adapter_dict):
     adapter_dict = {} # read_id: [adapter, strand]
     no_splint_reads = 0
     for read in reads:
-        name, seq, qual = read[0], read[1], read[2]
+        name = read[0]
         # get the alignments with the most matches
-        best = sorted(tmp_adapter_dict[name], key=lambda x:x[1], reverse=True)[0]
+        best = sorted(tmp_adapter_dict[name], key=lambda x: x[1], reverse=True)[0]
         if not best[0]:
             no_splint_reads += 1
             continue
