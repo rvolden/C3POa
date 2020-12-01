@@ -36,6 +36,10 @@ def parse_args():
                               file with 10x barcode sequences')
     parser.add_argument('--threads', '-n', type=int, default=1,
                         help='Number of threads to use during multiprocessing. Defaults to 1.')
+    parser.add_argument('--groupSize', '-g', type=int, default=1000,
+                        help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
+    parser.add_argument('--blatThreads', '-bt', action='store_true', default=False,
+                        help='''Use to chunk blat across the number of threads instead of by groupSize (faster).''')
     return parser.parse_args()
 
 def configReader(path, configIn):
@@ -84,10 +88,15 @@ def process(args, reads, blat, iteration):
 
 def chunk_process(num_reads, args, blat):
     '''Split the input fasta into chunks and process'''
-    chunk_size = (num_reads // args.threads) + 1
+    if args.blatThreads:
+        chunk_size = (num_reads // args.threads) + 1
+    else:
+        chunk_size = args.groupSize
+    if chunk_size > num_reads:
+        chunk_size = num_reads
 
     pool = mp.Pool(args.threads)
-    pbar = tqdm(total=args.threads)
+    pbar = tqdm(total=num_reads // chunk_size + 1, desc='Aligning with BLAT')
     iteration, current_num, tmp_reads, target = 1, 0, {}, chunk_size
     for read in mm.fastx_read(args.input_fasta_file, read_comment=False):
         tmp_reads[read[0]] = read[1]
