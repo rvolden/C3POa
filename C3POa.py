@@ -47,6 +47,8 @@ def parse_args():
                         help='Number of threads to use during multiprocessing. Defaults to 1.')
     parser.add_argument('--groupSize', '-g', type=int, default=1000,
                         help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
+    parser.add_argument('--blatThreads', '-b', action='store_true', default=False,
+                        help='''Use to chunk blat across the number of threads instead of by groupSize (faster).''')
     return parser.parse_args()
 
 def configReader(path, configIn):
@@ -190,7 +192,7 @@ def main(args):
 
     pool = mp.Pool(args.numThreads)
     iteration = 1
-    pbar = tqdm(total=total_reads//args.groupSize+1)
+    pbar = tqdm(total=total_reads // args.groupSize + 1, desc='Calling consensi')
     for step in range(0, total_reads, args.groupSize):
         interval1 = step
         interval2 = min(total_reads, step+args.groupSize)

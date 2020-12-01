@@ -62,12 +62,15 @@ def process(args, reads, blat, iteration):
 
 def chunk_process(num_reads, args, blat):
     '''Split the input fasta into chunks and process'''
-    chunk_size = (num_reads // args.numThreads) + 1
+    if args.blatThreads:
+        chunk_size = (num_reads // args.numThreads) + 1
+    else:
+        chunk_size = args.groupSize
     if chunk_size > num_reads:
         chunk_size = num_reads
 
     pool = mp.Pool(args.numThreads)
-    pbar = tqdm(total=args.numThreads)
+    pbar = tqdm(total=num_reads // chunk_size + 1, desc='Preprocessing')
     iteration, current_num, tmp_reads, target = 1, 0, {}, chunk_size
     for read in mm.fastx_read(args.reads, read_comment=False):
         if len(read[1]) < args.lencutoff:
