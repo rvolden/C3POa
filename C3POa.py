@@ -49,6 +49,8 @@ def parse_args():
                         help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
     parser.add_argument('--blatThreads', '-b', action='store_true', default=False,
                         help='''Use to chunk blat across the number of threads instead of by groupSize (faster).''')
+    parser.add_argument('--high_mem', '-m', action='store_true', default=False,
+                        help='Process reads while storing them all in RAM (Default false).')
     return parser.parse_args()
 
 def configReader(path, configIn):
@@ -173,7 +175,7 @@ def main(args):
             continue
         tmp_adapter_dict[read[0]] = [[None, 1, None]] # [adapter, matches, strand]
         total_reads += 1
-        read_list.append(read)
+        # read_list.append(read)
     adapter_dict, adapter_set, no_splint = preprocess(blat, args, tmp_dir, tmp_adapter_dict, total_reads)
 
     for adapter in adapter_set:
@@ -190,21 +192,49 @@ def main(args):
         splint_dict[splint[0]] = [splint[1]]
         splint_dict[splint[0]].append(mm.revcomp(splint[1]))
 
-    pool = mp.Pool(args.numThreads)
-    iteration = 1
-    pbar = tqdm(total=total_reads // args.groupSize + 1, desc='Calling consensi')
-    for step in range(0, total_reads, args.groupSize):
-        interval1 = step
-        interval2 = min(total_reads, step+args.groupSize)
+    ##### STREAM IN READS #####
+    if not args.high_mem:
+        pool = mp.Pool(args.numThreads)
+        pbar = tqdm(total=total_reads // args.groupSize + 1, desc='Calling consensi')
+        iteration, current_num, tmp_reads, target = 1, 0, [], args.groupSize
+        for read in mm.fastx_read(args.reads, read_comment=False):
+            if len(read[1]) < args.lencutoff:
+                continue
+            tmp_reads.append(read)
+            current_num += 1
+            if current_num == target:
+                pool.apply_async(analyze_reads,
+                    args=(args, tmp_reads, splint_dict, adapter_dict, adapter_set, iteration, racon),
+                    callback=lambda _: pbar.update(1)
+                )
+                iteration += 1
+                target = args.groupSize * iteration
+                if target >= total_reads:
+                    target = total_reads
+                tmp_reads = []
+        pool.close()
+        pool.join()
+        pbar.close()
+    ###########################
 
-        pool.apply_async(analyze_reads,
-            args=(args, read_list[interval1:interval2], splint_dict, adapter_dict, adapter_set, iteration, racon,),
-            callback=lambda _: pbar.update(1)
-        )
-        iteration += 1
-    pool.close()
-    pool.join()
-    pbar.close()
+    ##### STANDARD #####
+    else:
+        pool = mp.Pool(args.numThreads)
+        iteration = 1
+        pbar = tqdm(total=total_reads // args.groupSize + 1, desc='Calling consensi')
+        for step in range(0, total_reads, args.groupSize):
+            interval1 = step
+            interval2 = min(total_reads, step+args.groupSize)
+
+            pool.apply_async(analyze_reads,
+                args=(args, read_list[interval1:interval2], splint_dict, adapter_dict, adapter_set, iteration, racon,),
+                callback=lambda _: pbar.update(1)
+            )
+            iteration += 1
+        pool.close()
+        pool.join()
+        pbar.close()
+    ####################
 
     for adapter in adapter_set:
         os.system('cat {adapter_dir} >{cons}'.format(
