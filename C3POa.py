@@ -175,7 +175,8 @@ def main(args):
             continue
         tmp_adapter_dict[read[0]] = [[None, 1, None]] # [adapter, matches, strand]
         total_reads += 1
-        # read_list.append(read)
+        if args.high_mem:
+            read_list.append(read)
     adapter_dict, adapter_set, no_splint = preprocess(blat, args, tmp_dir, tmp_adapter_dict, total_reads)
 
     for adapter in adapter_set:
@@ -217,7 +218,7 @@ def main(args):
         pbar.close()
     ###########################
 
-    ##### STANDARD #####
+    ##### HIGH MEMORY #####
     else:
         pool = mp.Pool(args.numThreads)
         iteration = 1
