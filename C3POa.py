@@ -195,7 +195,8 @@ def main(args):
 
     ##### STREAM IN READS #####
     if not args.high_mem:
-        pool = mp.Pool(args.numThreads)
+        import gc
+        pool = mp.Pool(args.numThreads, maxtasksperchild=1)
         pbar = tqdm(total=total_reads // args.groupSize + 1, desc='Calling consensi')
         iteration, current_num, tmp_reads, target = 1, 0, [], args.groupSize
         for read in mm.fastx_read(args.reads, read_comment=False):
@@ -213,6 +214,7 @@ def main(args):
                 if target >= total_reads:
                     target = total_reads
                 tmp_reads = []
+                gc.collect()
         pool.close()
         pool.join()
         pbar.close()
@@ -250,5 +252,5 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    mp.set_start_method("spawn")
+    mp.set_start_method("forkserver")
     main(args)
