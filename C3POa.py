@@ -252,5 +252,5 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    mp.set_start_method("forkserver")
+    mp.set_start_method("spawn")
     main(args)
