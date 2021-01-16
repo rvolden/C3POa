@@ -79,7 +79,7 @@ def get_file_len(inFile):
 
 def cat_files(path, pattern, output):
     '''Use glob to get around bash argument list limitations'''
-    for f in tqdm(glob(path + pattern), desc='Catting files'):
+    for f in glob(path + pattern):
         os.system('cat {f} >>{out}'.format(f=f, out=output))
 
 def remove_files(path, pattern):
@@ -118,7 +118,7 @@ def chunk_process(num_reads, args, blat):
         idx_to_seq, seq_to_idx = {}, {}
 
     pool = mp.Pool(args.threads)
-    pbar = tqdm(total=num_reads // chunk_size + 1, desc='Aligning with BLAT')
+    pbar = tqdm(total=num_reads // chunk_size + 1, desc='Aligning with BLAT and processing')
     iteration, current_num, tmp_reads, target = 1, 0, {}, chunk_size
     for read in mm.fastx_read(args.input_fasta_file, read_comment=False):
         tmp_reads[read[0]] = read[1]
@@ -141,6 +141,8 @@ def chunk_process(num_reads, args, blat):
     flc = 'R2C2_full_length_consensus_reads.fasta'
     flc_left = 'R2C2_full_length_consensus_reads_left_splint.fasta'
     flc_right = 'R2C2_full_length_consensus_reads_right_splint.fasta'
+    pool = mp.Pool(args.threads)
+    print('Catting files', file=sys.stderr)
     if idx_to_seq:
         idx_to_seq['no_index_found'] = ''
         for idx in idx_to_seq.keys():
@@ -148,21 +150,27 @@ def chunk_process(num_reads, args, blat):
             if not os.path.isdir(args.output_path + idx):
                 os.mkdir(args.output_path + idx)
             pattern = 'post_tmp*/' + idx
-            cat_files(args.output_path, pattern + flc, args.output_path + idx + flc)
-            cat_files(args.output_path, pattern + flc_left, args.output_path + idx + flc_left)
-            cat_files(args.output_path, pattern + flc_right, args.output_path + idx + flc_right)
+            pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + idx + flc))
+            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + idx + flc_left))
+            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + idx + flc_right))
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
         mux_tsvs = 'post_tmp*/R2C2_oligodT_multiplexing.tsv'
         mux_tsv_final = args.output_path + 'R2C2_oligodT_multiplexing.tsv'
         cat_files(args.output_path, mux_tsvs, mux_tsv_final)
     else:
         pattern = 'post_tmp*/'
-        cat_files(args.output_path, pattern + flc, args.output_path + flc)
-        cat_files(args.output_path, pattern + flc_left, args.output_path + flc_left)
-        cat_files(args.output_path, pattern + flc_right, args.output_path + flc_right)
+        pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + flc))
+        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + flc_left))
+        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + flc_right))
         if args.barcoded:
             flc_bc = pattern + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
             flc_bc_final = args.output_path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
             cat_files(args.output_path, flc_bc, flc_bc_final)
+    pool.close()
+    pool.join()
     remove_files(args.output_path, 'post_tmp*')
 
 def read_fasta(inFile, indeces):
