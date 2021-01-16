@@ -163,7 +163,7 @@ def chunk_process(num_reads, args, blat):
             flc_bc = pattern + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
             flc_bc_final = args.output_path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
             cat_files(args.output_path, flc_bc, flc_bc_final)
-    remove_files(args.output_path + 'post_tmp*')
+    remove_files(args.output_path, 'post_tmp*')
 
 def read_fasta(inFile, indeces):
     '''Reads in FASTA files, returns a dict of header:sequence'''
@@ -247,7 +247,7 @@ def write_fasta_file(args, path, adapter_dict, reads, seq_to_idx, idx_to_seq):
         outdT = open(path + 'R2C2_oligodT_multiplexing.tsv', 'w')
         for idx in idx_to_seq:
             if os.path.exists(path + idx):
-                os.system('rm -r ' + path + idx)
+                shutil.rmtree(path + idx)
     else:
         out = open(path + 'R2C2_full_length_consensus_reads.fasta', 'w')
         out3 = open(path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
@@ -307,9 +307,9 @@ def write_fasta_file(args, path, adapter_dict, reads, seq_to_idx, idx_to_seq):
             if not os.path.isdir(demux_path):
                 os.mkdir(demux_path)
 
-            out = open(demux_path + 'R2C2_full_length_consensus_reads.fasta', 'w')
-            out3 = open(demux_path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
-            out5 = open(demux_path + 'R2C2_full_length_consensus_reads_right_splint.fasta', 'w')
+            out = open(demux_path + 'R2C2_full_length_consensus_reads.fasta', 'a+')
+            out3 = open(demux_path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'a+')
+            out5 = open(demux_path + 'R2C2_full_length_consensus_reads_right_splint.fasta', 'a+')
 
         seq = sequence[plus_positions[0]:minus_positions[0]]
         ada = sequence[max(plus_positions[0]-40, 0):minus_positions[0]+40]
