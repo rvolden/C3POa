@@ -153,10 +153,6 @@ def chunk_process(num_reads, args, blat):
             pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + idx + flc))
             pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + idx + flc_left))
             pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + idx + flc_right))
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
         mux_tsvs = 'post_tmp*/R2C2_oligodT_multiplexing.tsv'
         mux_tsv_final = args.output_path + 'R2C2_oligodT_multiplexing.tsv'
         cat_files(args.output_path, mux_tsvs, mux_tsv_final)
