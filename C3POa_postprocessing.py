@@ -7,27 +7,34 @@ import argparse
 import mappy as mm
 from tqdm import tqdm
 import multiprocessing as mp
+import editdistance as ld
+from glob import glob
+import shutil
 
 def parse_args():
     '''Parses arguments.'''
     parser = argparse.ArgumentParser(description='',
                                      add_help=True,
                                      prefix_chars='-')
-    parser.add_argument('--input_fasta_file', '-i', type=str)
+    parser.add_argument('--input_fasta_file', '-i', type=str, action='store',
+                        help='Fasta file with consensus called R2C2 reads')
     parser.add_argument('--output_path', '-o', type=str)
-    parser.add_argument('--adapter_file', '-a', type=str)
+    parser.add_argument('--adapter_file', '-a', type=str, action='store',
+                        help='Fasta file with adapter (3 and 5 prime) sequences')
+    parser.add_argument('--index_file', '-x', type=str, action='store',
+                        help='Fasta file with oligo dT indeces')
     parser.add_argument('--config', '-c', type=str, action='store', default='',
                         help='If you want to use a config file to specify paths to\
                               programs, specify them here. Use for poa, racon, water,\
                               blat, and minimap2 if they are not in your path.')
     parser.add_argument('--undirectional', '-u', action='store_true',
-                        help='By default, your cDNA molecules are assumed to be \
-                              directional with two sequences named "3Prime_adapter" \
-                              and "5Prime_adapter" expected in your adapter_file in \
-                              fasta format. If you add this flag your cDNA molecules \
-                              are expected to be undirectional and only one sequence \
-                              named "Adapter" should be in your adapter_file in fasta \
-                              format')
+                        help='''By default, your cDNA molecules are assumed to be
+                                directional with two sequences named "3Prime_adapter"
+                                and "5Prime_adapter" expected in your adapter_file in
+                                fasta format. If you add this flag your cDNA molecules
+                                are expected to be undirectional and only one sequence
+                                named "Adapter" should be in your adapter_file in fasta
+                                format''')
     parser.add_argument('--trim', '-t', action='store_true',
                         help='Use this flag to trim the adapters off the ends of \
                               your sequences.')
@@ -70,7 +77,17 @@ def get_file_len(inFile):
         count += 1
     return count
 
-def process(args, reads, blat, iteration):
+def cat_files(path, pattern, output):
+    '''Use glob to get around bash argument list limitations'''
+    for f in tqdm(glob(path + pattern), desc='Catting files'):
+        os.system('cat {f} >>{out}'.format(f=f, out=output))
+
+def remove_files(path, pattern):
+    '''Use glob to get around bash argument list limitations'''
+    for d in tqdm(glob(path + pattern), desc='Removing files'):
+        shutil.rmtree(d)
+
+def process(args, reads, blat, iteration, idx_to_seq, seq_to_idx):
     tmp_dir = args.output_path + 'post_tmp_' + str(iteration) + '/'
     if not os.path.isdir(tmp_dir):
         os.mkdir(tmp_dir)
@@ -84,7 +101,7 @@ def process(args, reads, blat, iteration):
     run_blat(tmp_dir, tmp_fa, args.adapter_file, blat)
     os.remove(tmp_fa)
     adapter_dict = parse_blat(tmp_dir, reads)
-    write_fasta_file(args, tmp_dir, adapter_dict, reads)
+    write_fasta_file(args, tmp_dir, adapter_dict, reads, seq_to_idx, idx_to_seq)
 
 def chunk_process(num_reads, args, blat):
     '''Split the input fasta into chunks and process'''
@@ -95,6 +112,11 @@ def chunk_process(num_reads, args, blat):
     if chunk_size > num_reads:
         chunk_size = num_reads
 
+    if args.index_file:
+        idx_to_seq, seq_to_idx = read_fasta(args.index_file, True)
+    else:
+        idx_to_seq, seq_to_idx = {}, {}
+
     pool = mp.Pool(args.threads)
     pbar = tqdm(total=num_reads // chunk_size + 1, desc='Aligning with BLAT')
     iteration, current_num, tmp_reads, target = 1, 0, {}, chunk_size
@@ -102,7 +124,11 @@ def chunk_process(num_reads, args, blat):
         tmp_reads[read[0]] = read[1]
         current_num += 1
         if current_num == target:
-            pool.apply_async(process, args=(args, tmp_reads, blat, iteration), callback=lambda _: pbar.update(1))
+            pool.apply_async(
+                process,
+                args=(args, tmp_reads, blat, iteration, idx_to_seq, seq_to_idx),
+                callback=lambda _: pbar.update(1)
+            )
             iteration += 1
             target = chunk_size * iteration
             if target >= num_reads:
@@ -112,30 +138,42 @@ def chunk_process(num_reads, args, blat):
     pool.join()
     pbar.close()
 
-    os.system('cat {flc} >{flc_final}'.format(
-            flc=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads.fasta',
-            flc_final=args.output_path + '/R2C2_full_length_consensus_reads.fasta')
-    )
-    os.system('cat {flc_left} >{flc_left_final}'.format(
-            flc_left=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads_left_splint.fasta',
-            flc_left_final=args.output_path + '/R2C2_full_length_consensus_reads_left_splint.fasta')
-    )
-    os.system('cat {flc_right} >{flc_right_final}'.format(
-            flc_right=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads_right_splint.fasta',
-            flc_right_final=args.output_path + '/R2C2_full_length_consensus_reads_right_splint.fasta')
-    )
-    if args.barcoded:
-        os.system('cat {flc_bc} >{flc_bc_final}'.format(
-                flc_bc=args.output_path + 'post_tmp*/R2C2_full_length_consensus_reads_10X_sequences.fasta',
-                flc_bc_final=args.output_path + '/R2C2_full_length_consensus_reads_10X_sequences.fasta')
-        )
-    os.system('rm -rf {tmps}'.format(tmps=args.output_path + 'post_tmp*'))
+    flc = 'R2C2_full_length_consensus_reads.fasta'
+    flc_left = 'R2C2_full_length_consensus_reads_left_splint.fasta'
+    flc_right = 'R2C2_full_length_consensus_reads_right_splint.fasta'
+    if idx_to_seq:
+        idx_to_seq['no_index_found'] = ''
+        for idx in idx_to_seq.keys():
+            idx += '/'
+            if not os.path.isdir(args.output_path + idx):
+                os.mkdir(args.output_path + idx)
+            pattern = 'post_tmp*/' + idx
+            cat_files(args.output_path, pattern + flc, args.output_path + idx + flc)
+            cat_files(args.output_path, pattern + flc_left, args.output_path + idx + flc_left)
+            cat_files(args.output_path, pattern + flc_right, args.output_path + idx + flc_right)
+        mux_tsvs = 'post_tmp*/R2C2_oligodT_multiplexing.tsv'
+        mux_tsv_final = args.output_path + 'R2C2_oligodT_multiplexing.tsv'
+        cat_files(args.output_path, mux_tsvs, mux_tsv_final)
+    else:
+        pattern = 'post_tmp*/'
+        cat_files(args.output_path, pattern + flc, args.output_path + flc)
+        cat_files(args.output_path, pattern + flc_left, args.output_path + flc_left)
+        cat_files(args.output_path, pattern + flc_right, args.output_path + flc_right)
+        if args.barcoded:
+            flc_bc = pattern + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
+            flc_bc_final = args.output_path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
+            cat_files(args.output_path, flc_bc, flc_bc_final)
+    remove_files(args.output_path + 'post_tmp*')
 
-def read_fasta(inFile):
+def read_fasta(inFile, indeces):
     '''Reads in FASTA files, returns a dict of header:sequence'''
-    readDict = {}
+    readDict, index_dict = {}, {}
     for read in mm.fastx_read(inFile, read_comment=False):
         readDict[read[0]] = read[1]
+        if indeces:
+            index_dict[read[1]] = read[0]
+    if indeces:
+        return readDict, index_dict
     return readDict
 
 def run_blat(path, infile, adapter_fasta, blat):
@@ -175,100 +213,139 @@ def parse_blat(path, reads):
                                                         position))
     return adapter_dict
 
-def match_index(sequence,sequence_to_index):
-    dist_dict = {}
-    dist_list = []
-    for position in range(len(sequence)):
-        for index_sequence, index in sequence_to_index.items():
-            if index not in dist_dict:
-                dist_dict[index] = []
-            query = sequence[position:position + len(index_sequence)]
-            if len(query) != len(index_sequence):
+def match_index(seq, seq_to_idx):
+    dist_dict, dist_list = {}, []
+    # there needs to be a better/more efficient way to do this.
+    for position in range(len(seq)):
+        for idx_seq, idx in seq_to_idx.items():
+            if idx not in dist_dict:
+                dist_dict[idx] = []
+            query = seq[position:position + len(idx_seq)]
+            if len(query) != len(idx_seq):
                 break
             else:
-                dist = editdistance.eval(query, index_sequence)
-                dist_dict[index].append(dist)
-    for index, distances in dist_dict.items():
-        dist_list.append((index, min(distances)))
+                dist = ld.eval(query, idx_seq)
+                dist_dict[idx].append(dist)
+    for idx, distances in dist_dict.items():
+        dist_list.append((idx, min(distances)))
     dist_list = sorted(dist_list, key=lambda x: x[1])
     if dist_list[0][1] < 2 and dist_list[1][1] - dist_list[0][1] > 1:
         return dist_list[0][0]
     else:
         return '-'
 
-def write_fasta_file(args, path, adapter_dict, reads):
+def write_fasta_file(args, path, adapter_dict, reads, seq_to_idx, idx_to_seq):
     undirectional = args.undirectional
     barcoded = args.barcoded
     trim = args.trim
 
-    out = open(path + 'R2C2_full_length_consensus_reads.fasta', 'w')
-    out3 = open(path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
-    out5 = open(path + 'R2C2_full_length_consensus_reads_right_splint.fasta', 'w')
+    odT = True if seq_to_idx else False
+
     if barcoded:
         out10X = open(path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta', 'w')
+    if odT:
+        outdT = open(path + 'R2C2_oligodT_multiplexing.tsv', 'w')
+        for idx in idx_to_seq:
+            if os.path.exists(path + idx):
+                os.system('rm -r ' + path + idx)
+    else:
+        out = open(path + 'R2C2_full_length_consensus_reads.fasta', 'w')
+        out3 = open(path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
+        out5 = open(path + 'R2C2_full_length_consensus_reads_right_splint.fasta', 'w')
 
     for name, sequence in (tqdm(reads.items()) if args.threads==1  else reads.items()):
         adapter_plus = sorted(adapter_dict[name]['+'],
                               key=lambda x: x[2], reverse=False)
         adapter_minus = sorted(adapter_dict[name]['-'],
                               key=lambda x: x[2], reverse=False)
-        plus_list_name, plus_list_position = [], []
-        minus_list_name, minus_list_position = [], []
+        plus_list_name, plus_positions = [], []
+        minus_list_name, minus_positions = [], []
 
         for adapter in adapter_plus:
             if adapter[0] != '-':
                 plus_list_name.append(adapter[0])
-                plus_list_position.append(adapter[2])
+                plus_positions.append(adapter[2])
         for adapter in adapter_minus:
             if adapter[0] != '-':
                 minus_list_name.append(adapter[0])
-                minus_list_position.append(adapter[2])
+                minus_positions.append(adapter[2])
 
         if len(plus_list_name) != 1 or len(minus_list_name) != 1:
             continue
-        if minus_list_position[0] <= plus_list_position[0]:
+        if minus_positions[0] <= plus_positions[0]:
             continue
 
-        use = False
         if undirectional:
             direction = '+'
-            use = True
+        elif plus_list_name[0] != minus_list_name[0]:
+            if plus_list_name[0] == '5Prime_adapter':
+                direction = '+'
+            else:
+                direction = '-'
         else:
-            if plus_list_name[0] != minus_list_name[0]:
-                use = True
-                if plus_list_name[0] == '5Prime_adapter':
-                    direction = '+'
-                else:
-                    direction = '-'
-        if not use:
             continue
 
-        seq = sequence[plus_list_position[0]:minus_list_position[0]]
-        ada = sequence[max(plus_list_position[0]-40, 0):minus_list_position[0]+40]
+        if odT:
+            outdT.write('%s\t%s\t%s\n' %(
+                name,
+                mm.revcomp(sequence[minus_positions[0]-16:minus_positions[0]+4]),
+                sequence[plus_positions[0]-4:plus_positions[0]+16])
+            )
+            reverse_index, forward_index = '-', '-'
+            forward_index = match_index(sequence[plus_positions[0]-4:plus_positions[0]+16], seq_to_idx)
+            reverse_index = match_index(mm.revcomp(sequence[minus_positions[0]-16:minus_positions[0]+4]), seq_to_idx)
+
+            demux = False
+            if forward_index in idx_to_seq and reverse_index not in idx_to_seq:
+                direction, idx_name, demux = '-', forward_index, True
+            if reverse_index in idx_to_seq and forward_index not in idx_to_seq:
+                direction, idx_name, demux = '+', reverse_index, True
+            if not demux:
+                idx_name = 'no_index_found'
+
+            demux_path = path + idx_name + '/'
+            if not os.path.isdir(demux_path):
+                os.mkdir(demux_path)
+
+            out = open(demux_path + 'R2C2_full_length_consensus_reads.fasta', 'w')
+            out3 = open(demux_path + 'R2C2_full_length_consensus_reads_left_splint.fasta', 'w')
+            out5 = open(demux_path + 'R2C2_full_length_consensus_reads_right_splint.fasta', 'w')
+
+        seq = sequence[plus_positions[0]:minus_positions[0]]
+        ada = sequence[max(plus_positions[0]-40, 0):minus_positions[0]+40]
         name += '_' + str(len(seq))
         if direction == '+':
             if trim:
                 out.write('>%s\n%s\n' %(name, seq))
             else:
                 out.write('>%s\n%s\n' %(name, ada))
-            out5.write('>%s\n%s\n' %(name, mm.revcomp(sequence[:plus_list_position[0]])))
-            out3.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
+            out5.write('>%s\n%s\n' %(name, mm.revcomp(sequence[:plus_positions[0]])))
+            out3.write('>%s\n%s\n' %(name, sequence[minus_positions[0]:]))
             if barcoded:
-                out10X.write('>%s\n%splus\n' %(name, mm.revcomp(sequence[minus_list_position[0]-40:minus_list_position[0]])))
+                out10X.write('>%s\n%splus\n' %(name, mm.revcomp(sequence[minus_positions[0]-40:minus_positions[0]])))
         elif direction == '-':
             if trim:
                 out.write('>%s\n%s\n' %(name, mm.revcomp(seq)))
             else:
                 out.write('>%s\n%s\n' %(name, mm.revcomp(ada)))
-            out3.write('>%s\n%s\n' %(name, mm.revcomp(sequence[:plus_list_position[0]+40])))
-            out5.write('>%s\n%s\n' %(name, sequence[minus_list_position[0]:]))
+            out3.write('>%s\n%s\n' %(name, mm.revcomp(sequence[:plus_positions[0]+40])))
+            out5.write('>%s\n%s\n' %(name, sequence[minus_positions[0]:]))
             if barcoded:
-                out10X.write('>%s\n%sminus\n' %(name, sequence[plus_list_position[0]:plus_list_position[0]+40]))
-    out.close()
-    out3.close()
-    out5.close()
+                out10X.write('>%s\n%sminus\n' %(name, sequence[plus_positions[0]:plus_positions[0]+40]))
+
+        if odT:
+            out.close()
+            out3.close()
+            out5.close()
+
+    if not odT:
+        out.close()
+        out3.close()
+        out5.close()
     if barcoded:
         out10X.close()
+    if odT:
+        outdT.close()
 
 def main(args):
     if not args.output_path.endswith('/'):
@@ -288,10 +365,16 @@ def main(args):
         num_reads = get_file_len(args.input_fasta_file)
         chunk_process(num_reads, args, blat)
     else:
-        reads = read_fasta(args.input_fasta_file)
+        reads = read_fasta(args.input_fasta_file, False)
+        
+        if args.index_file:
+            idx_to_seq, seq_to_idx = read_fasta(args.index_file, True)
+        else:
+            idx_to_seq, seq_to_idx = {}, {}
+
         run_blat(args.output_path, args.input_fasta_file, args.adapter_file, blat)
         adapter_dict = parse_blat(args.output_path, reads)
-        write_fasta_file(args, args.output_path, adapter_dict, reads)
+        write_fasta_file(args, args.output_path, adapter_dict, reads, seq_to_idx, idx_to_seq)
 
 if __name__ == '__main__':
     args = parse_args()
