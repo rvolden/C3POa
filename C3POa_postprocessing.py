@@ -77,9 +77,9 @@ def get_file_len(inFile):
         count += 1
     return count
 
-def cat_files(path, pattern, output):
+def cat_files(path, pattern, output, pos):
     '''Use glob to get around bash argument list limitations'''
-    for f in glob(path + pattern):
+    for f in tqdm(glob(path + pattern), position=pos):
         os.system('cat {f} >>{out}'.format(f=f, out=output))
 
 def remove_files(path, pattern):
@@ -150,21 +150,21 @@ def chunk_process(num_reads, args, blat):
             if not os.path.isdir(args.output_path + idx):
                 os.mkdir(args.output_path + idx)
             pattern = 'post_tmp*/' + idx
-            pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + idx + flc))
-            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + idx + flc_left))
-            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + idx + flc_right))
+            pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + idx + flc, 0))
+            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + idx + flc_left, 1))
+            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + idx + flc_right, 2))
         mux_tsvs = 'post_tmp*/R2C2_oligodT_multiplexing.tsv'
         mux_tsv_final = args.output_path + 'R2C2_oligodT_multiplexing.tsv'
-        cat_files(args.output_path, mux_tsvs, mux_tsv_final)
+        pool.apply_async(cat_files, args=(args.output_path, mux_tsvs, mux_tsv_final, 3))
     else:
         pattern = 'post_tmp*/'
-        pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + flc))
-        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + flc_left))
-        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + flc_right))
+        pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + flc, 0))
+        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + flc_left, 1))
+        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + flc_right, 2))
         if args.barcoded:
             flc_bc = pattern + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
             flc_bc_final = args.output_path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
-            cat_files(args.output_path, flc_bc, flc_bc_final)
+            pool.apply_async(cat_files, args=(args.output_path, flc_bc, flc_bc_final, 3))
     pool.close()
     pool.join()
     remove_files(args.output_path, 'post_tmp*')
