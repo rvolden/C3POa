@@ -6,6 +6,8 @@ import sys
 import mappy as mm
 from tqdm import tqdm
 import multiprocessing as mp
+import shutil
+from glob import glob
 
 def preprocess(blat, args, tmp_dir, tmp_adapter_dict, num_reads):
     tmp_fasta = tmp_dir + 'R2C2_temp_for_BLAT.fasta'
@@ -41,6 +43,16 @@ def preprocess(blat, args, tmp_dir, tmp_adapter_dict, num_reads):
         adapter_set.add(best[0])
         adapter_dict[name] = [best[0], best[2]]
     return adapter_dict, adapter_set, no_splint_reads
+
+def cat_files(path, pattern, output):
+    '''Use glob to get around bash argument list limitations'''
+    for f in tqdm(glob(path + pattern), desc='Catting psls'):
+        os.system('cat {f} >>{out}'.format(f=f, out=output))
+
+def remove_files(path, pattern):
+    '''Use glob to get around bash argument list limitations'''
+    for d in tqdm(glob(path + pattern), desc='Removing preprocessing files'):
+        shutil.rmtree(d)
 
 def process(args, reads, blat, iteration):
     tmp_dir = args.out_path + 'pre_tmp_' + str(iteration) + '/'
@@ -88,8 +100,9 @@ def chunk_process(num_reads, args, blat):
     pool.join()
     pbar.close()
 
-    os.system('cat {psls} >{psl_final}'.format(
-            psls=args.out_path + 'pre_tmp_*/tmp_splint_aln.psl',
-            psl_final=args.out_path + 'tmp/splint_to_read_alignments.psl')
+    cat_files(
+        args.out_path,
+        'pre_tmp_*/tmp_splint_aln.psl',
+        args.out_path + 'tmp/splint_to_read_alignments.psl'
     )
-    os.system('rm -rf {tmps}'.format(tmps=args.out_path + 'pre_tmp*'))
+    remove_files(args.out_path, 'pre_tmp*')

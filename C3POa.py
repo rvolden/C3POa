@@ -10,6 +10,8 @@ import mappy as mm
 from conk import conk
 from tqdm import tqdm
 import gc
+import shutil
+from glob import glob
 
 path = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/bin/'
 sys.path.append(os.path.abspath(path))
@@ -72,6 +74,16 @@ def configReader(path, configIn):
         sys.stderr.write('Using ' + str(missing)
                          + ' from your path, not the config file.\n')
     return progs
+
+def cat_files(path, pattern, output, description):
+    '''Use glob to get around bash argument list limitations'''
+    for f in tqdm(glob(path + pattern), desc=description):
+        os.system('cat {f} >>{out}'.format(f=f, out=output))
+
+def remove_files(path, pattern):
+    '''Use glob to get around bash argument list limitations'''
+    for d in tqdm(glob(path + pattern), desc='Removing files'):
+        shutil.rmtree(d)
 
 def rounding(x, base):
     '''Rounds to the nearest base, we use 50'''
@@ -214,15 +226,19 @@ def main(args):
     pbar.close()
 
     for adapter in adapter_set:
-        os.system('cat {adapter_dir} >{cons}'.format(
-                adapter_dir=args.out_path + adapter + '/tmp*/R2C2_Consensus.fasta',
-                cons=args.out_path + adapter + '/R2C2_Consensus.fasta')
+        cat_files(
+            args.out_path + adapter,
+            '/tmp*/R2C2_Consensus.fasta',
+            args.out_path + adapter + '/R2C2_Consensus.fasta',
+            'Catting consensus reads'
         )
-        os.system('cat {adapter_dir} >{subreads}'.format(
-                adapter_dir=args.out_path + adapter + '/tmp*/subreads.fastq',
-                subreads=args.out_path + adapter + '/R2C2_Subreads.fastq')
+        cat_files(
+            args.out_path + adapter,
+            '/tmp*/subreads.fastq',
+            args.out_path + adapter + '/R2C2_Subreads.fastq',
+            'Catting subreads'
         )
-        os.system('rm -rf {tmps}'.format(tmps=args.out_path + adapter + '/tmp*'))
+        remove_files(args.out_path + adapter, '/tmp*')
 
 if __name__ == '__main__':
     args = parse_args()
