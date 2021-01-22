@@ -77,8 +77,12 @@ def configReader(path, configIn):
 
 def cat_files(path, pattern, output, description):
     '''Use glob to get around bash argument list limitations'''
+    final_fh = open(output, 'w+')
     for f in tqdm(glob(path + pattern), desc=description):
-        os.system('cat {f} >>{out}'.format(f=f, out=output))
+        with open(f) as fh:
+            for line in fh:
+                final_fh.write(line)
+    final_fh.close()
 
 def remove_files(path, pattern):
     '''Use glob to get around bash argument list limitations'''

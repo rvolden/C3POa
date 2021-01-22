@@ -46,8 +46,12 @@ def preprocess(blat, args, tmp_dir, tmp_adapter_dict, num_reads):
 
 def cat_files(path, pattern, output):
     '''Use glob to get around bash argument list limitations'''
+    final_psl = open(output, 'w+')
     for f in tqdm(glob(path + pattern), desc='Catting psls'):
-        os.system('cat {f} >>{out}'.format(f=f, out=output))
+        with open(f) as psl:
+            for line in psl:
+                final_psl.write(line)
+    final_psl.close()
 
 def remove_files(path, pattern):
     '''Use glob to get around bash argument list limitations'''
