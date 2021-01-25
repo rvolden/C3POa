@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--adapter_file', '-a', type=str, action='store',
                         help='Fasta file with adapter (3 and 5 prime) sequences')
     parser.add_argument('--index_file', '-x', type=str, action='store',
-                        help='Fasta file with oligo dT indeces')
+                        help='Fasta file with oligo dT indexes')
     parser.add_argument('--config', '-c', type=str, action='store', default='',
                         help='If you want to use a config file to specify paths to\
                               programs, specify them here. Use for poa, racon, water,\
@@ -79,8 +79,12 @@ def get_file_len(inFile):
 
 def cat_files(path, pattern, output, pos):
     '''Use glob to get around bash argument list limitations'''
+    final_fh = open(output, 'w+')
     for f in tqdm(glob(path + pattern), position=pos):
-        os.system('cat {f} >>{out}'.format(f=f, out=output))
+        with open(f) as fh:
+            for line in fh:
+                final_fh.write(line)
+    final_fh.close()
 
 def remove_files(path, pattern):
     '''Use glob to get around bash argument list limitations'''
@@ -169,14 +173,14 @@ def chunk_process(num_reads, args, blat):
     pool.join()
     remove_files(args.output_path, 'post_tmp*')
 
-def read_fasta(inFile, indeces):
+def read_fasta(inFile, indejes):
     '''Reads in FASTA files, returns a dict of header:sequence'''
     readDict, index_dict = {}, {}
     for read in mm.fastx_read(inFile, read_comment=False):
         readDict[read[0]] = read[1]
-        if indeces:
+        if indexes:
             index_dict[read[1]] = read[0]
-    if indeces:
+    if indexes:
         return readDict, index_dict
     return readDict
 
