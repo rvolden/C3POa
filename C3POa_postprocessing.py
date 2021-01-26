@@ -11,14 +11,18 @@ import editdistance as ld
 from glob import glob
 import shutil
 
+VERSION = 'v2.1.6'
+
 def parse_args():
     '''Parses arguments.'''
-    parser = argparse.ArgumentParser(description='',
+    parser = argparse.ArgumentParser(description='Reorients/demuxes/trims consensus reads.',
                                      add_help=True,
                                      prefix_chars='-')
     parser.add_argument('--input_fasta_file', '-i', type=str, action='store',
                         help='Fasta file with consensus called R2C2 reads')
-    parser.add_argument('--output_path', '-o', type=str)
+    parser.add_argument('--output_path', '-o', type=str, action='store', default=os.getcwd(),
+                        help='''Directory where all the files will end up.
+                                Defaults to your current directory.''')
     parser.add_argument('--adapter_file', '-a', type=str, action='store',
                         help='Fasta file with adapter (3 and 5 prime) sequences')
     parser.add_argument('--index_file', '-x', type=str, action='store',
@@ -47,6 +51,11 @@ def parse_args():
                         help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
     parser.add_argument('--blatThreads', '-bt', action='store_true', default=False,
                         help='''Use to chunk blat across the number of threads instead of by groupSize (faster).''')
+    parser.add_argument('--version', '-v', action='version', version=VERSION, help='Prints the C3POa version.')
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
     return parser.parse_args()
 
 def configReader(path, configIn):
@@ -386,4 +395,7 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
+    if not args.input_fasta_file or not args.adapter_file:
+        print('Reads (--input_fasta_file/-i) and adapter (--adapter_file/-a) are required', file=sys.stderr)
+        sys.exit(1)
     main(args)

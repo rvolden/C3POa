@@ -13,23 +13,23 @@ import gc
 import shutil
 from glob import glob
 
-path = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/bin/'
-sys.path.append(os.path.abspath(path))
+PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/bin/'
+sys.path.append(os.path.abspath(PATH))
 
 from preprocess import preprocess
 from call_peaks import call_peaks
 from determine_consensus import determine_consensus
 
+VERSION = 'v2.1.6'
+
 def parse_args():
     '''Parses arguments.'''
-    parser = argparse.ArgumentParser(description='Makes consensus sequences \
-                                                    from R2C2 reads.',
+    parser = argparse.ArgumentParser(description='Makes consensus sequences from R2C2 reads.',
                                      add_help=True,
                                      prefix_chars='-')
-    required = parser.add_argument_group('required arguments')
-    required.add_argument('--reads', '-r', type=str, action='store', required=True,
+    parser.add_argument('--reads', '-r', type=str, action='store',
                           help='FASTQ file that contains the long R2C2 reads.')
-    required.add_argument('--splint_file', '-s', type=str, action='store', required=True,
+    parser.add_argument('--splint_file', '-s', type=str, action='store',
                           help='Path to the splint FASTA file.')
     parser.add_argument('--out_path', '-o', type=str, action='store', default=os.getcwd(),
                         help='''Directory where all the files will end up.
@@ -52,6 +52,11 @@ def parse_args():
                         help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
     parser.add_argument('--blatThreads', '-b', action='store_true', default=False,
                         help='''Use to chunk blat across the number of threads instead of by groupSize (faster).''')
+    parser.add_argument('--version', '-v', action='version', version=VERSION, help='Prints the C3POa version.')
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
     return parser.parse_args()
 
 def configReader(path, configIn):
@@ -246,5 +251,8 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
+    if not args.reads or not args.splint_file:
+        print('Reads (--reads/-r) and splint (--splint_file/-s) are required', file=sys.stderr)
+        sys.exit(1)
     mp.set_start_method("spawn")
     main(args)
