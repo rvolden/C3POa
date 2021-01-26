@@ -201,9 +201,21 @@ def main(args):
         if not os.path.exists(args.out_path + adapter):
             os.mkdir(args.out_path + adapter)
 
-    print('No splint reads:', no_splint, file=log_file)
-    print('Under len cutoff:', short_reads, file=log_file)
-    print('Total thrown away reads:', short_reads + no_splint, file=log_file)
+    all_reads = total_reads + short_reads
+    print('C3POa version:', VERSION, file=log_file)
+    print('No splint reads:',
+           no_splint,
+           '({:.2f}%)'.format((no_splint/all_reads)*100),
+           file=log_file)
+    print('Under len cutoff:',
+           short_reads,
+           '({:.2f}%)'.format((short_reads/all_reads)*100),
+           file=log_file)
+    print('Total thrown away reads:',
+           short_reads + no_splint,
+           '({:.2f}%)'.format(((short_reads + no_splint)/all_reads)*100),
+           file=log_file)
+    print('Total reads:', all_reads, file=log_file)
     log_file.close()
 
     splint_dict = {}
