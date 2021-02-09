@@ -7,14 +7,15 @@ import os
 import subprocess
 from consensus import pairwise_consensus
 
-def determine_consensus(args, read, subreads, sub_qual, racon, tmp_dir, subread_file):
+def determine_consensus(args, read, subreads, sub_qual, dangling_subreads, qual_dangling_subreads, racon, tmp_dir, subread_file):
     name, seq, qual = read[0], read[1], read[2]
     repeats = len(subreads)
 
-    if repeats == 2 and args.zero:
-        final_cons = zero_repeats(name, seq, qual, subreads, sub_qual, subread_file)
-        if final_cons and len(final_cons) >= args.mdistcutoff:
-            return final_cons, 0
+    if repeats == 0 and args.zero:
+        if len(dangling_subreads) == 2:
+            final_cons = zero_repeats(name, seq, qual, dangling_subreads, qual_dangling_subreads, subread_file)
+            if final_cons and len(final_cons) >= args.mdistcutoff:
+                return final_cons, 0
 
     # subread is the master subread fastq for this group
     subread_fh = open(subread_file, 'a+')
@@ -27,7 +28,9 @@ def determine_consensus(args, read, subreads, sub_qual, racon, tmp_dir, subread_
 
     # align subreads together using abPOA
     poa_aligner = poa.msa_aligner(match=5)
-    if repeats == 2:
+    if repeats == 1:
+        abpoa_cons = subreads[0]
+    elif repeats == 2:
         res = poa_aligner.msa(subreads, out_cons=False, out_msa=True)
         if not res.msa_seq:
             subread_fh.close()
@@ -54,14 +57,29 @@ def determine_consensus(args, read, subreads, sub_qual, racon, tmp_dir, subread_
     for i in range(repeats):
         subread = subreads[i]
         q = sub_qual[i]
+        qname = name + '_' + str(i+1)
+        print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=subread_fh)
+        print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=tmp_subread_fh)
         for hit in mm_align.map(subread):
-            qname = name + '_subread_' + str(i)
             print("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
                 qname, str(len(subread)), hit.q_st, hit.q_en,
                 hit.strand, name, hit.ctg_len, hit.r_st,
                 hit.r_en, hit.mlen, hit.blen, hit.mapq), file=overlap_fh)
-            print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=subread_fh)
-            print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=tmp_subread_fh)
+
+    for j in range(len(dangling_subreads)):
+        subread = dangling_subreads[j]
+        q = qual_dangling_subreads[j]
+        if j == 0:
+            qname = name + '_' + str(j)
+        else:
+            qname = name + '_' + str(i+2)
+        print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=subread_fh)
+        print('@{name}\n{sub}\n+\n{q}'.format(name=qname, sub=subread, q=q), file=tmp_subread_fh)
+        for hit in mm_align.map(subread):
+            print("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
+                qname, str(len(subread)), hit.q_st, hit.q_en,
+                hit.strand, name, hit.ctg_len, hit.r_st,
+                hit.r_en, hit.mlen, hit.blen, hit.mapq), file=overlap_fh)
     subread_fh.close()
     overlap_fh.close()
     tmp_subread_fh.close()
@@ -89,7 +107,7 @@ def zero_repeats(name, seq, qual, subreads, sub_qual, subread_file):
     # subread is the master subread fastq for this group
     subread_fh = open(subread_file, 'a+')
     for i in range(len(subreads)):
-        print('@{name}\n{sub}\n+\n{q}'.format(name=name + '_subread_' + str(i),
+        print('@{name}\n{sub}\n+\n{q}'.format(name=name + '_' + str(i),
                                               sub=subreads[i],
                                               q=sub_qual[i]),
                                               file=subread_fh)
@@ -102,8 +120,8 @@ def zero_repeats(name, seq, qual, subreads, sub_qual, subread_file):
     if not mappy_res:
         return ''
 
-    left = subreads[0][:mappy_res[0]]
-    right = subreads[1][mappy_res[3]:]
+    left = subreads[1][:mappy_res[2]]
+    right = subreads[0][mappy_res[1]:]
     overlap_seq1 = subreads[0][mappy_res[0]:mappy_res[1]]
     overlap_qual1 = sub_qual[0][mappy_res[0]:mappy_res[1]]
     overlap_seq2 = subreads[1][mappy_res[2]:mappy_res[3]]
