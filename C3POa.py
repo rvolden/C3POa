@@ -20,7 +20,7 @@ from preprocess import preprocess
 from call_peaks import call_peaks
 from determine_consensus import determine_consensus
 
-VERSION = 'v2.1.6'
+VERSION = 'v2.2.0'
 
 def parse_args():
     '''Parses arguments.'''
@@ -123,7 +123,7 @@ def analyze_reads(args, reads, splint_dict, adapter_dict, adapter_set, iteration
             continue
 
         # check for outliers in subread length
-        subreads, qual_subreads = [], []
+        subreads, qual_subreads, dangling_subreads, qual_dangling_subreads = [], [], [], []
         if len(peaks) > 1:
             subread_lens = np.diff(peaks)
             subread_lens = [rounding(x, 50) for x in subread_lens]
@@ -134,16 +134,16 @@ def analyze_reads(args, reads, splint_dict, adapter_dict, adapter_set, iteration
                     subreads.append(seq[bounds[0]:bounds[1]])
                     qual_subreads.append(qual[bounds[0]:bounds[1]])
             if peaks[0] > 100:
-                subreads.append(seq[:peaks[0]])
-                qual_subreads.append(qual[:peaks[0]])
+                dangling_subreads.append(seq[:peaks[0]])
+                qual_dangling_subreads.append(qual[:peaks[0]])
             if seq_len - peaks[-1] > 100:
-                subreads.append(seq[peaks[-1]:])
-                qual_subreads.append(qual[peaks[-1]:])
+                dangling_subreads.append(seq[peaks[-1]:])
+                qual_dangling_subreads.append(qual[peaks[-1]:])
         else:
-            subreads.append(seq[:peaks[0]])
-            qual_subreads.append(qual[:peaks[0]])
-            subreads.append(seq[peaks[0]:])
-            qual_subreads.append(qual[peaks[0]:])
+            dangling_subreads.append(seq[:peaks[0]])
+            qual_dangling_subreads.append(qual[:peaks[0]])
+            dangling_subreads.append(seq[peaks[0]:])
+            qual_dangling_subreads.append(qual[peaks[0]:])
 
         tmp_dir = args.out_path + adapter_dict[name][0] + '/tmp' + str(iteration) + '/'
         if not os.path.isdir(tmp_dir):
@@ -151,7 +151,7 @@ def analyze_reads(args, reads, splint_dict, adapter_dict, adapter_set, iteration
         subread_file = tmp_dir + 'subreads.fastq'
 
         consensus, repeats = determine_consensus(
-            args, read, subreads, qual_subreads,
+            args, read, subreads, qual_subreads, dangling_subreads, qual_dangling_subreads,
             racon, tmp_dir, subread_file
         )
 
