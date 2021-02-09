@@ -11,7 +11,7 @@ import editdistance as ld
 from glob import glob
 import shutil
 
-VERSION = 'v2.1.6'
+VERSION = 'v2.2.0'
 
 def parse_args():
     '''Parses arguments.'''
