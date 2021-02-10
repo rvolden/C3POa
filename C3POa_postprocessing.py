@@ -11,7 +11,7 @@ import editdistance as ld
 from glob import glob
 import shutil
 
-VERSION = 'v2.2.0'
+VERSION = 'v2.2.1'
 
 def parse_args():
     '''Parses arguments.'''
@@ -182,7 +182,7 @@ def chunk_process(num_reads, args, blat):
     pool.join()
     remove_files(args.output_path, 'post_tmp*')
 
-def read_fasta(inFile, indejes):
+def read_fasta(inFile, indexes):
     '''Reads in FASTA files, returns a dict of header:sequence'''
     readDict, index_dict = {}, {}
     for read in mm.fastx_read(inFile, read_comment=False):
