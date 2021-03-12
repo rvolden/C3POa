@@ -9,9 +9,10 @@ from tqdm import tqdm
 import multiprocessing as mp
 import editdistance as ld
 from glob import glob
+import gzip
 import shutil
 
-VERSION = 'v2.2.1'
+VERSION = 'v2.2.2'
 
 def parse_args():
     '''Parses arguments.'''
@@ -51,6 +52,8 @@ def parse_args():
                         help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
     parser.add_argument('--blatThreads', '-bt', action='store_true', default=False,
                         help='''Use to chunk blat across the number of threads instead of by groupSize (faster).''')
+    parser.add_argument('--compress_output', '-co', action='store_true', default=False,
+                        help='Use to compress (gzip) both the consensus fasta and subread fastq output files.')
     parser.add_argument('--version', '-v', action='version', version=VERSION, help='Prints the C3POa version.')
 
     if len(sys.argv) == 1:
@@ -86,12 +89,18 @@ def get_file_len(inFile):
         count += 1
     return count
 
-def cat_files(path, pattern, output, pos):
+def cat_files(path, pattern, output, pos, compress):
     '''Use glob to get around bash argument list limitations'''
-    final_fh = open(output, 'w+')
+    if compress:
+        output += '.gz'
+        final_fh = gzip.open(output, 'wb+')
+    else:
+        final_fh = open(output, 'w+')
     for f in tqdm(glob(path + pattern), position=pos):
         with open(f) as fh:
             for line in fh:
+                if compress:
+                    line = line.encode()
                 final_fh.write(line)
     final_fh.close()
 
@@ -163,21 +172,45 @@ def chunk_process(num_reads, args, blat):
             if not os.path.isdir(args.output_path + idx):
                 os.mkdir(args.output_path + idx)
             pattern = 'post_tmp*/' + idx
-            pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + idx + flc, 0))
-            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + idx + flc_left, 1))
-            pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + idx + flc_right, 2))
+            pool.apply_async(cat_files, args=(
+                    args.output_path,
+                    pattern + flc,
+                    args.output_path + idx + flc,
+                    0, args.compress_output))
+            pool.apply_async(cat_files, args=(
+                    args.output_path,
+                    pattern + flc_left,
+                    args.output_path + idx + flc_left,
+                    1, args.compress_output))
+            pool.apply_async(cat_files, args=(
+                    args.output_path,
+                    pattern + flc_right,
+                    args.output_path + idx + flc_right,
+                    2, args.compress_output))
         mux_tsvs = 'post_tmp*/R2C2_oligodT_multiplexing.tsv'
         mux_tsv_final = args.output_path + 'R2C2_oligodT_multiplexing.tsv'
-        pool.apply_async(cat_files, args=(args.output_path, mux_tsvs, mux_tsv_final, 3))
+        pool.apply_async(cat_files, args=(args.output_path, mux_tsvs, mux_tsv_final, 3, False))
     else:
         pattern = 'post_tmp*/'
-        pool.apply_async(cat_files, args=(args.output_path, pattern + flc, args.output_path + flc, 0))
-        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_left, args.output_path + flc_left, 1))
-        pool.apply_async(cat_files, args=(args.output_path, pattern + flc_right, args.output_path + flc_right, 2))
+        pool.apply_async(cat_files, args=(
+                args.output_path,
+                pattern + flc,
+                args.output_path + flc,
+                0, args.compress_output))
+        pool.apply_async(cat_files, args=(
+                args.output_path,
+                pattern + flc_left,
+                args.output_path + flc_left,
+                1, args.compress_output))
+        pool.apply_async(cat_files, args=(
+                args.output_path,
+                pattern + flc_right,
+                args.output_path + flc_right,
+                2, args.compress_output))
         if args.barcoded:
             flc_bc = pattern + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
             flc_bc_final = args.output_path + 'R2C2_full_length_consensus_reads_10X_sequences.fasta'
-            pool.apply_async(cat_files, args=(args.output_path, flc_bc, flc_bc_final, 3))
+            pool.apply_async(cat_files, args=(args.output_path, flc_bc, flc_bc_final, 3, args.compress_output))
     pool.close()
     pool.join()
     remove_files(args.output_path, 'post_tmp*')

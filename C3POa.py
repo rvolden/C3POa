@@ -10,6 +10,7 @@ import mappy as mm
 from conk import conk
 from tqdm import tqdm
 import gc
+import gzip
 import shutil
 from glob import glob
 
@@ -20,7 +21,7 @@ from preprocess import preprocess
 from call_peaks import call_peaks
 from determine_consensus import determine_consensus
 
-VERSION = 'v2.2.1'
+VERSION = 'v2.2.2'
 
 def parse_args():
     '''Parses arguments.'''
@@ -52,6 +53,8 @@ def parse_args():
                         help='Number of reads processed by each thread in each iteration. Defaults to 1000.')
     parser.add_argument('--blatThreads', '-b', action='store_true', default=False,
                         help='''Use to chunk blat across the number of threads instead of by groupSize (faster).''')
+    parser.add_argument('--compress_output', '-co', action='store_true', default=False,
+                        help='Use to compress (gzip) both the consensus fasta and subread fastq output files.')
     parser.add_argument('--version', '-v', action='version', version=VERSION, help='Prints the C3POa version.')
 
     if len(sys.argv) == 1:
@@ -80,12 +83,18 @@ def configReader(path, configIn):
                          + ' from your path, not the config file.\n')
     return progs
 
-def cat_files(path, pattern, output, description):
+def cat_files(path, pattern, output, description, compress):
     '''Use glob to get around bash argument list limitations'''
-    final_fh = open(output, 'w+')
+    if compress:
+        output += '.gz'
+        final_fh = gzip.open(output, 'wb+')
+    else:
+        final_fh = open(output, 'w+')
     for f in tqdm(glob(path + pattern), desc=description):
         with open(f) as fh:
             for line in fh:
+                if compress:
+                    line = line.encode()
                 final_fh.write(line)
     final_fh.close()
 
@@ -251,13 +260,13 @@ def main(args):
             args.out_path + adapter,
             '/tmp*/R2C2_Consensus.fasta',
             args.out_path + adapter + '/R2C2_Consensus.fasta',
-            'Catting consensus reads'
+            'Catting consensus reads', compress=args.compress_output
         )
         cat_files(
             args.out_path + adapter,
             '/tmp*/subreads.fastq',
             args.out_path + adapter + '/R2C2_Subreads.fastq',
-            'Catting subreads'
+            'Catting subreads', compress=args.compress_output
         )
         remove_files(args.out_path + adapter, '/tmp*')
 
