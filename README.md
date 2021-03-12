@@ -96,6 +96,10 @@ Arguments:
 -b  split input by number of threads for blat alignment instead of groupSize
 
 -z  use to exclude zero repeat reads
+
+-co compress the output fasta/q files (gzip)
+
+-v  print the C3POa version and exit
 ```
 
 Example output read (readName_averageQuality_originalReadLength_numberOfRepeats_subreadLength):
@@ -149,6 +153,10 @@ If given a fasta of oligo dT indexes, it will also demux the reads by index.
 -g  group size (number of reads given to each thread, default 1000)
 
 -bt split input by number of threads instead of groupSize
+
+-co compress the output fasta/q files (gzip)
+
+-v  print the C3POa version and exit
 ```
 
 ```bash
