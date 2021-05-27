@@ -12,7 +12,7 @@ from glob import glob
 import gzip
 import shutil
 
-VERSION = 'v2.2.2'
+VERSION = 'v2.2.3'
 
 def parse_args():
     '''Parses arguments.'''

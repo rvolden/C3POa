@@ -21,7 +21,7 @@ from preprocess import preprocess
 from call_peaks import call_peaks
 from determine_consensus import determine_consensus
 
-VERSION = 'v2.2.2'
+VERSION = 'v2.2.3'
 
 def parse_args():
     '''Parses arguments.'''
@@ -212,6 +212,7 @@ def main(args):
 
     all_reads = total_reads + short_reads
     print('C3POa version:', VERSION, file=log_file)
+    print('Total reads:', all_reads, file=log_file)
     print('No splint reads:',
            no_splint,
            '({:.2f}%)'.format((no_splint/all_reads)*100),
@@ -224,7 +225,7 @@ def main(args):
            short_reads + no_splint,
            '({:.2f}%)'.format(((short_reads + no_splint)/all_reads)*100),
            file=log_file)
-    print('Total reads:', all_reads, file=log_file)
+    print('Reads after preprocessing:', all_reads - (short_reads + no_splint), file=log_file)
     log_file.close()
 
     splint_dict = {}
