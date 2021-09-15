@@ -16,4 +16,4 @@ dependencies:
     - mappy
     - pip
     - pip:
-        - pyabpoa
+        - pyabpoa=1.0.5

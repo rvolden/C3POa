@@ -5,7 +5,7 @@ cwd=$(pwd)
 # Resolve dependencies
 
 echo 'Pip installables (scipy, numpy, pyabpoa, mappy, Cython, tqdm)'
-python3 -m pip install --user --upgrade scipy numpy pyabpoa mappy Cython tqdm
+python3 -m pip install --user --upgrade scipy numpy pyabpoa=1.0.5 mappy Cython tqdm
 
 echo 'conk'
 python3 -m pip install --user --upgrade wheel setuptools Cython
