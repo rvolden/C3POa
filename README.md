@@ -33,7 +33,7 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-Alteratively, you can grab all of the pip installable packages:
+Alternatively, you can grab all of the pip installable packages:
 ```bash
 python3 -m pip install --user --upgrade scipy numpy pyabpoa=1.0.5 mappy Cython tqdm setuptools wheel
 ```
